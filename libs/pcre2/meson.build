@@ -1,12 +1,11 @@
-# lust.pcre2: PCRE2 (Perl compatible) regular expressions. PCRE2 is plain C
-# but its API is full of opaque handles, macros and out parameters, so the
-# module is an `ffi` library with a small shim (shim.c) in front of it;
-# re-exporting PCRE2 itself would leak its whole API out of the module. The
-# vendored library is linked statically (pcre2_dep, see vendor/meson.build),
-# so the module does not depend on a system libpcre2. Being plain C without
+# lust.pcre2: PCRE2 (Perl compatible) regular expressions, a Lua C API
+# module over the vendored PCRE2 (see pcre2_dep in vendor/meson.build),
+# which is linked statically, so the module does not depend on a system
+# libpcre2. It is not an `ffi` library on purpose: `require`ing one costs
+# the FFI, a `cdef` and bytecode (some 230k instructions), the C API
+# version only registers its functions, and a regexp match is dominated by
+# PCRE2 itself, so the JIT would gain nothing. Being plain C without
 # static constructors it costs nothing at startup, so it is linked into
 # `lust` too.
-lib_kind = 'ffi'
-lib_lua = files('pcre2.lua')
-lib_sources = files('shim.c')
+lib_sources = files('pcre2.c')
 lib_deps = [pcre2_dep]

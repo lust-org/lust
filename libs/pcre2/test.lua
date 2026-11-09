@@ -105,6 +105,23 @@ T.run {
     T.eq(table.concat(got, ","), "a1,b2")
   end,
 
+  gmatch_independent_loops = function()
+    -- nested and interleaved loops over one regexp keep their own state
+    local re = new("\\w")
+    local got = {}
+    for a in re:gmatch("xy") do
+      for b in re:gmatch("12") do got[#got + 1] = a .. b end
+    end
+    T.eq(table.concat(got, ","), "x1,x2,y1,y2")
+    local i, j = re:gmatch("abc"), re:gmatch("de")
+    T.eq(i() .. j() .. i() .. j(), "adbe")
+    T.eq(j(), nil)
+    T.eq(i(), "c")
+    -- abandoned loops are just garbage
+    for _ = 1, 1000 do for _ in re:gmatch("abc") do break end end
+    collectgarbage()
+  end,
+
   gmatch_empty_matches = function()
     local n = 0
     for _ in new("x*"):gmatch("abc") do n = n + 1 end
@@ -152,7 +169,8 @@ T.run {
   gsub_bad_replacement = function()
     T.raises(function() new("a"):gsub("a", "\\1") end, "does not exist")
     T.raises(function() new("a"):gsub("a", "\\x") end, "must be followed")
-    T.raises(function() new("a"):gsub("a") end, "bad argument #3")
+    -- (argument numbers of a method call do not count self)
+    T.raises(function() new("a"):gsub("a") end, "bad argument #2")
   end,
 
   utf8 = function()
@@ -271,9 +289,10 @@ T.run {
 
   argument_errors = function()
     T.raises(function() pcre2.new() end, "bad argument #1")
-    T.raises(function() new("a"):find() end, "bad argument #2")
+    -- (argument numbers of a method call do not count self)
+    T.raises(function() new("a"):find() end, "bad argument #1")
     T.raises(function() new("a").find("x", "a") end, "bad argument #1")
-    T.raises(function() new("a"):find("a", "x") end, "bad argument #3")
+    T.raises(function() new("a"):find("a", "x") end, "bad argument #2")
   end,
 
   garbage_collection = function()
