@@ -60,6 +60,27 @@ static void lust_print_usage(void);
 
 /* luajit.c's main(), under another name: ours wraps it. */
 #define main luajit_main
+/*
+ * The interactive banner is followed by the "JIT: ON SSE3 ..." line, printed
+ * by the static print_jit_status(lua_State *L) of luajit.c, which is both
+ * defined and called (as print_jit_status(L)) in that file. To drop the line
+ * without editing it, print_jit_status is made a function-like macro that
+ * looks at its argument: the definition's argument is `lua_State *L` and is
+ * left alone (expands back to the original, which the preprocessor does not
+ * expand recursively), the calls' argument is exactly `L` and expands to
+ * nothing. The test pastes the argument onto LUST_PROBE_, which is only a
+ * defined macro for the call form `L`.
+ */
+#define LUST_CAT_(a, b) a##b
+#define LUST_CAT(a, b) LUST_CAT_(a, b)
+#define LUST_PICK(a, b, ...) b
+#define LUST_PICK_(...) LUST_PICK(__VA_ARGS__)
+#define LUST_PROBE_L ~, CALL
+#define LUST_JS_CALL(x) ((void)0)
+#define LUST_JS_DECL(x) print_jit_status(x)
+#define print_jit_status(x)                                                   \
+  LUST_CAT(LUST_JS_, LUST_PICK_(LUST_PROBE_##x, DECL))(x)
+
 #include "luajit.c"
 #undef main
 
