@@ -23,10 +23,16 @@ T.run {
     end
   end,
 
-  static_libraries_are_preloaded = function()
+  -- Embedded libraries come from lust's own searcher: no file lookup, and
+  -- nothing registered per library at startup.
+  static_libraries_are_embedded = function()
     if mode ~= "static" then return end
-    for _, lib in ipairs(libs) do
-      T.eq(type(package.preload["lust." .. lib]), "function", lib)
+    for name in pairs(package.preload) do
+      assert(not name:find("^lust%."), name .. " registered in package.preload")
     end
+    for _, lib in ipairs(libs) do
+      T.eq(type(package.loaders[2]("lust." .. lib)), "function", lib)
+    end
+    T.eq(package.loaders[2]("lust.does_not_exist"), nil)
   end,
 }

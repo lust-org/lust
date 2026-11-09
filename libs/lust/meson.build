@@ -45,7 +45,7 @@ foreach name, info : lib_infos
   shared_mods += mod
   alias_target('lib-' + name, mod)
 
-  if lust_feature.allowed()
+  if lust_feature.allowed() and info['embed']
     # Same sources again, as a static archive for linking into `lust`.
     archive = static_library(
       'lust_' + name,

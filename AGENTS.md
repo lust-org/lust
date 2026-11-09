@@ -20,6 +20,21 @@ static archive linked into the `lust` binary (LuaJIT + all libraries).
   the vendored LuaJIT and embedded by `libs/ffi_shim.c`) additionally
   export the C functions their Lua part binds, and must keep them linked
   (they are only reached via dlsym).
+- **Startup cost of `lust` must not grow with the number of libraries**
+  (there will be many; every start pays for everything linked in, used or
+  not). Therefore:
+  - A library with a *dynamic* dependency must never put it in `lust`'s
+    `NEEDED` list (the loader maps it on every start, ~60k instructions
+    for libz alone). Either write it as an `ffi` library and
+    `ffi.load()` the system library in its Lua part (lazy `dlopen` on
+    `require`, no build-time dependency), or set `lib_embed = false` in
+    its `meson.build`: it is then built as a `.so` only and `lust` loads
+    it from its install `cmoddir`. Static deps from `vendor/` are fine.
+  - Nothing may happen per library at startup: `src/lust.c` has one
+    searcher over a static table, no `package.preload` entries, no init.
+  - `tests/test_startup.py` enforces this (same `NEEDED` set as plain
+    luajit, small instruction budget). Don't raise the budget to make a
+    library fit; fix the library.
 - Requiring one library must not load any other (`tests/test_lazy.lua`).
 - Stock luajit finds `require "lust.<x>"` at `<cpath>/lust/<x>.so`, so
   module output names/dirs must keep that layout.

@@ -11,12 +11,18 @@ install_subdir(
 )
 
 # 2. Generated list of embedded libraries (an X-macro, see src/lust.c).
+fs = import('fs')
 embedded = []
-foreach name : enabled_libs
-  embedded += 'X(@0@)'.format(name)
+foreach name, info : lib_infos
+  if info['embed']
+    embedded += 'X(@0@)'.format(name)
+  endif
 endforeach
+# Where `lust` finds the libraries that are not embedded.
+lust_cmoddir = fs.is_absolute(cmoddir) ? cmoddir : get_option('prefix') / cmoddir
 conf = configuration_data()
 conf.set('LUST_DATADIR', datadir)
+conf.set('LUST_CMODDIR', lust_cmoddir)
 conf.set('LUST_EMBEDDED_LIBS', ' '.join(embedded))
 lust_libs_h = configure_file(
   input: 'lust_libs.h.in',

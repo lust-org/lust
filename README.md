@@ -5,9 +5,12 @@ A collection of C libraries for LuaJIT, with two ways to use each of them:
 - **as a loadable module** (`lust/<name>.so`) for the stock `luajit`
   interpreter. Loading is a plain `dlopen`, and you only pay for the
   libraries you `require`.
-- **statically linked into `lust`**, a standard LuaJIT interpreter with all
-  libraries built in (registered in `package.preload`), so there is nothing
-  to look up or `dlopen` at all.
+- **statically linked into `lust`**, a standard LuaJIT interpreter with the
+  libraries built in, so there is nothing to look up or `dlopen`. Startup
+  does not grow with the number of libraries: they are found through one
+  lookup table when required. Libraries with a dynamic dependency are not
+  linked in (that would make every start map it): `lust` loads their `.so`
+  from the install directory on demand, see "Adding a library".
 
 ```lua
 local crc = require "lust.crc"
@@ -16,7 +19,7 @@ print(crc.crc32("123456789")) --> 3421780262
 
 | library     | what                | dependency                              |
 | ----------- | ------------------- | --------------------------------------- |
-| `lust.crc`  | zlib checksums      | system zlib, linked dynamically         |
+| `lust.crc`  | zlib checksums      | system zlib, linked dynamically (`.so` only, not in `lust`) |
 | `lust.xxh`  | xxHash              | `vendor/xxhash`, linked statically      |
 | `lust.xxhffi` | xxHash, same API  | as above, but bound through the FFI     |
 
@@ -28,8 +31,10 @@ Libraries come in two kinds (`lib_kind` in their `meson.build`):
   functions. A Lua file binds them with `ffi.cdef`; it is compiled to
   bytecode at build time, embedded, and only loaded on `require`
   (`lust.xxhffi`). The FFI calls are visible to the JIT, which is the main
-  point. The embedded bytecode must match the LuaJIT that loads it
-  (version and GC64), otherwise `require` fails with a clear error.
+  point. A system library is best bound with `ffi.load()`: it is then
+  `dlopen`ed on `require` only, so it can live inside `lust` for free.
+  The embedded bytecode must match the LuaJIT that loads it (version and
+  GC64), otherwise `require` fails with a clear error.
 
 ## Building
 
@@ -127,6 +132,9 @@ resolved through pkg-config; they stay shared libraries at runtime), or
      `lib_kind = 'ffi'`, `lib_lua`); copy `libs/crc/meson.build` or
      `libs/xxhffi/meson.build`,
    - `test.lua` (see `libs/crc/test.lua`).
+   - a library with a dynamic dependency: write it as `ffi` with
+     `ffi.load()`, or set `lib_embed = false` (`.so` only, loaded by
+     `lust` on demand). `tests/test_startup.py` guards `lust`'s startup.
 2. Add `<name>` to `all_libs` in `libs/meson.build`.
 3. For a static dependency, add it to `vendor/vendor.toml`, vendor it
    with `vendor.py` and declare a `<dep>_dep` for it in

@@ -5,6 +5,9 @@
 /* Where the Lua part of the runtime (jit.* modules) is installed. */
 #define LUST_DATADIR "@LUST_DATADIR@"
 
+/* Where the libraries that are not embedded (lib_embed = false) are. */
+#define LUST_CMODDIR "@LUST_CMODDIR@"
+
 /* X-macro list of the libraries linked into this binary. */
 #define LUST_EMBEDDED_LIBS(X) @LUST_EMBEDDED_LIBS@
 

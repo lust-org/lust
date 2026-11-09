@@ -11,6 +11,11 @@
 #          the LuaJIT FFI to bind them. It is compiled to bytecode and
 #          embedded, and only loaded on `require` (see libs/xxhffi/).
 #
+#      Optional `lib_embed = false` (default true) keeps the library out of
+#      `lust`: it is then only built as a .so, which `lust` loads on demand
+#      from its install cmoddir. REQUIRED for a library that links a
+#      dynamic dependency (see AGENTS.md); `ffi` libraries don't need it.
+#
 # From these a loadable module `lust/<name>.so` and a static archive (for
 # the `lust` binary) are built. Each library only pulls in its own
 # dependencies, so using one never costs anything for the others.
@@ -41,6 +46,7 @@ foreach name : enabled_libs
   lib_deps = [] # its dependencies (dynamic system ones or vendored static)
   lib_kind = 'capi' # or 'ffi'
   lib_lua = [] # 'ffi' only: the Lua file binding the C functions
+  lib_embed = true # link into `lust`
   subdir(name)
   if lib_kind not in ['capi', 'ffi']
     error('@0@: lib_kind must be "capi" or "ffi"'.format(name))
@@ -53,6 +59,7 @@ foreach name : enabled_libs
       'kind': lib_kind,
       'sources': lib_sources,
       'lua': lib_lua,
+      'embed': lib_embed,
       'deps': lib_deps,
     },
   }
