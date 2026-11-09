@@ -30,13 +30,18 @@ lust_libs_h = configure_file(
   configuration: conf,
 )
 
-# 3. LuaJIT's stock main(), with luaL_openlibs redirected to lust_openlibs().
-#    Compiled in its own target so the define doesn't leak into lust.c.
+# 3. LuaJIT's stock main() (via lust_main.c, which only replaces the version
+#    banner), with luaL_openlibs redirected to lust_openlibs().
+#    Compiled in its own target so the defines don't leak into lust.c.
+#    The lust version is the meson project version (top level meson.build).
 luajit_main = static_library(
   'luajit_main',
-  luajit_src / 'src' / 'luajit.c',
+  'lust_main.c',
   luajit_build[2], # generated luajit.h, found via the build dir include
-  c_args: ['-DluaL_openlibs=lust_openlibs'],
+  c_args: [
+    '-DluaL_openlibs=lust_openlibs',
+    '-DLUST_VERSION="@0@"'.format(meson.project_version()),
+  ],
   dependencies: lust_dep,
   # Upstream code: it needs POSIX (sigaction), and we don't police its warnings.
   override_options: ['warning_level=0', 'c_std=gnu11'],
