@@ -13,9 +13,10 @@ static archive linked into the `lust` binary (LuaJIT + all libraries).
 - Build system is meson only, `meson_version: '>=1.3.0'` (Ubuntu 24.04).
   Do not use newer-only features (e.g. `build_subdir` needs 1.10).
 - C11 for our code. Only upstream `luajit.c` is built as `gnu11`. The one
-  exception is C++17 for code that wraps C++ dependencies (`libs/re2`:
-  `extern "C"` shim over RE2) and for the vendored RE2/Abseil themselves.
-  A C++ library links the C++ runtime statically (`cpp_rt_dep`) and is
+  exception is C++17 for code that wraps C++ dependencies (an `extern "C"`
+  shim) and for vendored C++ code (RE2/Abseil, currently vendored but not
+  used by any library). A C++ library links the C++ runtime statically
+  (`cpp_rt_dep`) and is
   `lib_embed = false`: libstdc++'s static constructors (iostream, locale,
   exception pool) cost ~110k instructions per start.
 - Prefer the Lua C API (`capi`, the default) over `ffi`: requiring an

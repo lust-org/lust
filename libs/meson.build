@@ -5,13 +5,13 @@
 #   2. create libs/<name>/ with a test.lua and a meson.build that sets
 #      `lib_sources` and `lib_deps`, plus `lib_kind` (default 'capi'):
 #        - 'capi': <name>.c exports `luaopen_lust_<name>` tagged LUST_API
-#          and uses the Lua C API (see libs/crc/meson.build). Preferred.
+#          and uses the Lua C API (see libs/xxh/meson.build). Preferred.
 #        - 'ffi': static FFI bindings, costlier to `require`: only where
 #          the JIT pays off hugely (see AGENTS.md). The C code is plain C
 #          exporting (LUST_API) the functions to call; `lib_lua` is a Lua
 #          file using the LuaJIT FFI to bind them. It is compiled to
 #          bytecode and embedded, and only loaded on `require` (see
-#          libs/xxhffi/).
+#          libs/ffi_shim.c; no library uses it at the moment).
 #
 #      Every library also MUST have a doc-shortform.txt: its API as
 #      succinct as possible, which becomes part of `lust`'s help text
@@ -27,7 +27,7 @@
 # the `lust` binary) are built. Each library only pulls in its own
 # dependencies, so using one never costs anything for the others.
 
-all_libs = ['crc', 'xxh', 'xxhffi', 're2', 'pcre2']
+all_libs = ['xxh', 'pcre2']
 
 requested = get_option('libs')
 enabled_libs = requested.length() > 0 ? requested : all_libs

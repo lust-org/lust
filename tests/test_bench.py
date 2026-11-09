@@ -15,8 +15,8 @@ differ by well under 1%, so a real slowdown (or speedup, which should be
 recorded) of a few percent stands out. That also lets all runs go in
 parallel, each process pinned to one cpu of its own.
 
-The counts depend on the toolchain and the system libraries (e.g. libz
-for lust.crc), so after an intended change, or on another system, record
+The counts depend on the toolchain and the system libraries (e.g. libc
+or PCRE2's build flags), so after an intended change, or on another system, record
 them anew (only counts that are new or moved by more than NOISE are
 rewritten, so this doesn't churn the other baselines):
 

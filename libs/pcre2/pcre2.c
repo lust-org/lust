@@ -8,8 +8,7 @@
  *
  * PCRE2 backtracks, so a pattern can take exponential time. Every match is
  * therefore bounded (`match_limit`, `depth_limit`, `max_mem`): when a limit
- * is hit, the matching function raises an error instead of hanging. If you
- * need guaranteed linear time use lust.re2 instead.
+ * is hit, the matching function raises an error instead of hanging.
  *
  *   local pcre2 = require "lust.pcre2"
  *   local re = assert(pcre2.new("(\\w+)@(?<host>\\w+)\\.com"))
