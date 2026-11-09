@@ -11,3 +11,8 @@ exclude = ["tests"]
 repo_url = "https://github.com/PCRE2Project/pcre2.git"
 rev = "pcre2-10.49"
 exclude = ["maint", "doc", "testdata"]
+
+[yyjson]
+repo_url = "https://github.com/ibireme/yyjson.git"
+rev = "0.13.0"
+exclude = ["doc", "test"]
