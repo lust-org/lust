@@ -26,6 +26,7 @@
      with named fields (`{ a = 1 }`, `{ a = f() }`): the compiled bytecode
      would differ from build to build. Write `local t = {}; t.a = 1`
      (`tests/test_bytecode.py`).
+   - errors follow the conventions in [Error handling](error-handling.md).
 2. Add `<name>` to `all_libs` in `libs/meson.build`.
 3. For a static dependency, add it to `vendor/vendor.toml`, vendor it
    with `vendor.py` and declare a `<dep>_dep` for it in

@@ -144,3 +144,5 @@ resolved through pkg-config; they stay shared libraries at runtime), or
 
 - [Adding a library](docs/adding-a-library.md)
 - [Benchmark regressions](docs/benchmark-regressions.md)
+- [Error handling](docs/error-handling.md): when libraries raise and
+  when they return `nil, err`

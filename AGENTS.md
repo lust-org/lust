@@ -81,5 +81,7 @@ when its topic comes up; new project-wide conventions go there too.
   changes, committing the diff with them (see
   `docs/benchmark-regressions.md`). Every library needs `bench/*.lua`
   exercising its API.
+- Errors: misuse and out of memory raise, bad input returns `nil, err`
+  (unless `nil` is a normal result); see `docs/error-handling.md`.
 - Commit each finished change separately; amend when asked to change a
   previous commit.
