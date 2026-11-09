@@ -1,0 +1,8 @@
+[luajit]
+repo_url = "https://github.com/LuaJIT/LuaJIT.git"
+rev = "v2.1"
+
+[xxhash]
+repo_url = "https://github.com/Cyan4973/xxHash.git"
+rev = "v0.8.4"
+exclude = ["tests"]
