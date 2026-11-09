@@ -97,7 +97,7 @@ def bench(args):
     # Benchmark what is on disk: build everything first.
     args.targets = ["all"]
     compile_(args)
-    run(sys.executable, "bench/bench.py", "-B", args.builddir, *args.bench_args)
+    run(sys.executable, "tools/bench/bench.py", "-B", args.builddir, *args.bench_args)
 
 
 def main():
@@ -123,11 +123,11 @@ def main():
     p.add_argument("targets", nargs="*", help="meson test arguments, e.g. --suite crc")
     p.set_defaults(fn=test)
 
-    p = sub.add_parser("bench", parents=[common], help="benchmark startup and speed (args go to bench/bench.py)")
+    p = sub.add_parser("bench", parents=[common], help="benchmark startup and speed (args go to tools/bench/bench.py)")
     p.set_defaults(fn=bench)
 
     # `bench` forwards what it doesn't know (e.g. --only startup --cpu 2,
-    # see bench/bench.py -h); for the other commands that is an error.
+    # see tools/bench/bench.py -h); for the other commands that is an error.
     args, extra = ap.parse_known_args()
     if args.cmd == "bench":
         args.bench_args = extra

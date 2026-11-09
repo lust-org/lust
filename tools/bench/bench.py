@@ -14,7 +14,7 @@ interleaved across all variants (so drift hits all of them alike), wall
 time measured around posix_spawn+wait. The cost of the require is the
 difference to the same interpreter running an empty chunk. Where `perf`
 works, user space instructions are reported too: they are free of timing
-noise. Steady state: bench/throughput.lua, several processes per variant.
+noise. Steady state: tools/bench/throughput.lua, several processes per variant.
 
 Run through `./dev.py bench` (it builds first) or directly after a build.
 """
@@ -28,7 +28,7 @@ import sys
 import time
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 HERE = Path(__file__).resolve().parent
 
 

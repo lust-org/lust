@@ -119,8 +119,8 @@ libs/lust/          defines the build targets of all libraries
 src/                the `lust` binary (lust.c + build of LuaJIT)
 examples/           runnable examples, one per library
 tools/              helper used by the meson build
+tools/bench/        startup / steady state benchmark (`./dev.py bench`)
 tests/              test harness + cross library tests
-bench/              startup / steady state benchmark (`./dev.py bench`)
 vendor/luajit/      LuaJIT (managed by vendor.py, never edit)
 vendor/xxhash/      xxHash (managed by vendor.py, never edit)
 vendor/meson.build  build definitions of the vendored dependencies
@@ -166,7 +166,7 @@ libraries with the same API; `--only startup|throughput`):
   `-e 'require "lust.<lib>"'`, interleaved across variants, and the cost
   of the require is the difference to an empty chunk. User space
   instruction counts (via `perf`, if usable) are noise free.
-- **steady state**: `bench/throughput.lua` hashes 8 B to 64 KiB inputs;
+- **steady state**: `tools/bench/throughput.lua` hashes 8 B to 64 KiB inputs;
   several processes per variant, because JIT trace layout varies by run.
 
 For stable numbers use the `performance` cpufreq governor
