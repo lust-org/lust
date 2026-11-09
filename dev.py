@@ -13,7 +13,7 @@ Examples:
   ./dev.py build lust -D libs=crc,xxh # configure which libs get built
   ./dev.py test
   ./dev.py test --suite pcre2 -v      # options go to `meson test`
-  ./dev.py bench                      # C API vs FFI libraries, pinned to cpu 0
+  ./dev.py bench                      # C API vs FFI libraries, pinned cpus
   ./dev.py install lust --prefix /usr # needs root, e.g. via sudo/pkexec
   ./dev.py install libs --destdir pkg # staging for distro packaging
 """

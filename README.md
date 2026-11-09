@@ -208,7 +208,7 @@ the baselines):
 
 `./dev.py bench` builds everything and compares `lust.xxh` (C API) with
 `lust.xxhffi` (FFI), each as a `.so` in a plain luajit and linked into
-`lust`, pinned to CPU 0 (`--cpu N` to change; `--libs a,b` to compare other
+`lust`, pinned (`--cpu N`, default 0; `--libs a,b` to compare other
 libraries with the same API; `--only startup|throughput`):
 
 - **startup**: the interpreter is spawned hundreds of times with
@@ -217,9 +217,15 @@ libraries with the same API; `--only startup|throughput`):
   instruction counts (via `perf`, if usable) are noise free.
 - **steady state**: `tools/bench/throughput.lua` hashes 8 B to 64 KiB inputs;
   several processes per variant, because JIT trace layout varies by run.
+  A round (one process per variant) runs on one CPU, rounds run in
+  parallel, each on a physical core of its own of the same type as
+  `--cpu` (P/E cores, never SMT siblings). Every variant gets a process
+  per core, so faster cores favour none. `--jobs N` limits the cores,
+  `--jobs 1` runs serially on `--cpu`.
 
 For stable numbers use the `performance` cpufreq governor
 (`sudo cpupower frequency-set -g performance`), disable turbo/boost, close
-other load, or isolate the CPU (`isolcpus=0` on the kernel command line).
+other load, or isolate the CPUs (`isolcpus=...` on the kernel command
+line).
 The plain luajit used is the vendored build (`build/vendor/luajit`), so
 that both sides run the same VM binary; `--luajit` selects another one.

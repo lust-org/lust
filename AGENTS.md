@@ -74,7 +74,7 @@ static archive linked into the `lust` binary (LuaJIT + all libraries).
   Don't re-record a baseline to hide a regression: only for intended
   changes, committing the diff with them (see "Benchmark regressions" in
   `README.md`). Every library needs `bench/*.lua` exercising its API.
-- `./dev.py bench` compares flavours (CPU 0 pinned); keep it working.
+- `./dev.py bench` compares flavours (pinned cpus); keep it working.
 - Adding a library: see "Adding a library" in `README.md`.
 - Commit each finished change separately; amend when asked to change a
   previous commit.
