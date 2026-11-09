@@ -18,6 +18,14 @@ static archive linked into the `lust` binary (LuaJIT + all libraries).
   A C++ library links the C++ runtime statically (`cpp_rt_dep`) and is
   `lib_embed = false`: libstdc++'s static constructors (iostream, locale,
   exception pool) cost ~110k instructions per start.
+- Prefer the Lua C API (`capi`, the default) over `ffi`: requiring an
+  `ffi` library costs ~90k instructions more (FFI, `cdef`, bytecode,
+  symbol lookups). Use `ffi` only where the JIT should pay off hugely:
+  tiny, hot, allocation free calls (hashes, checksums), not work
+  dominated by the library itself (regexps). LuaJIT specializes traces
+  on the function object: never return a fresh C closure per call that
+  ends up in a hot loop (a `gmatch` iterator), return a callable
+  userdata instead (see `libs/pcre2`).
 - `.so` modules must not link libluajit: only the LuaJIT headers are used,
   symbols resolve from the host interpreter. Keep `b_lundef=false`.
 - Export only `luaopen_lust_<name>` (`LUST_API`); everything else hidden.

@@ -27,13 +27,17 @@ print(crc.crc32("123456789")) --> 3421780262
 
 Libraries come in two kinds (`lib_kind` in their `meson.build`):
 
-- `capi`: classic Lua C API module (`lust.crc`, `lust.xxh`).
+- `capi`: classic Lua C API module (`lust.crc`, `lust.xxh`, `lust.pcre2`).
+  The default, and cheapest to `require`.
 - `ffi`: [static FFI bindings](https://evo-lua.github.io/docs/background-information/luajit/static-ffi-bindings/).
   The C code is plain C that knows nothing about Lua and just exports
   functions. A Lua file binds them with `ffi.cdef`; it is compiled to
   bytecode at build time, embedded, and only loaded on `require`
   (`lust.xxhffi`). The FFI calls are visible to the JIT, which is the main
-  point. A system library is best bound with `ffi.load()`: it is then
+  point, but `require`ing one costs about 90k instructions more than a
+  C API module, so use it only where the JIT pays off hugely (tiny, hot
+  calls like hashing), not where the library itself dominates (regexp
+  matching). A system library is best bound with `ffi.load()`: it is then
   `dlopen`ed on `require` only, so it can live inside `lust` for free.
   The embedded bytecode must match the LuaJIT that loads it (version and
   GC64), otherwise `require` fails with a clear error.
