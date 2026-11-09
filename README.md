@@ -73,6 +73,15 @@ LUA_CPATH="$PWD/build/libs/?.so" luajit -e 'print(require("lust.xxh").xxh64("abc
 build/src/lust -e 'print(require("lust.xxh").xxh64("abc"))'
 ```
 
+`examples/*.lua` show each library and run with the built `lust`:
+
+```sh
+build/src/lust examples/xxh.lua
+build/src/lust examples/xxhffi.lua
+# crc is not linked into `lust`, so it is looked up in the build tree:
+LUA_CPATH="$PWD/build/libs/?.so" build/src/lust examples/crc.lua
+```
+
 ## Installing
 
 Like `make install`; targets are `all` (default), `lust`, `libs` or a
@@ -108,6 +117,7 @@ libs/<name>/        one directory per library: <name>.c, test.lua, meson.build
 libs/ffi_shim.c     loads the embedded bytecode of the `ffi` libraries
 libs/lust/          defines the build targets of all libraries
 src/                the `lust` binary (lust.c + build of LuaJIT)
+examples/           runnable examples, one per library
 tools/              helper used by the meson build
 tests/              test harness + cross library tests
 bench/              startup / steady state benchmark (`./dev.py bench`)
@@ -131,7 +141,8 @@ resolved through pkg-config; they stay shared libraries at runtime), or
    - `meson.build` setting `lib_sources` and `lib_deps` (and for `ffi`:
      `lib_kind = 'ffi'`, `lib_lua`); copy `libs/crc/meson.build` or
      `libs/xxhffi/meson.build`,
-   - `test.lua` (see `libs/crc/test.lua`).
+   - `test.lua` (see `libs/crc/test.lua`),
+   - optionally `examples/<name>.lua`.
    - a library with a dynamic dependency: write it as `ffi` with
      `ffi.load()`, or set `lib_embed = false` (`.so` only, loaded by
      `lust` on demand). `tests/test_startup.py` guards `lust`'s startup.
