@@ -95,3 +95,24 @@ if lust_feature.allowed()
     suite: ['startup'],
   )
 endif
+
+# The embedded bytecode of `ffi` libraries has to be reproducible.
+ffi_luas = []
+foreach name, info : lib_infos
+  if info['kind'] == 'ffi'
+    ffi_luas += info['lua']
+  endif
+endforeach
+if ffi_luas.length() > 0
+  test(
+    'ffi bytecode is reproducible',
+    py,
+    args: [
+      files('test_bytecode.py'),
+      luajit_exe,
+      luajit_src / 'src',
+      ffi_luas,
+    ],
+    suite: ['bytecode'],
+  )
+endif
