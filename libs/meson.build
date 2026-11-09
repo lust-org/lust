@@ -27,7 +27,7 @@
 # the `lust` binary) are built. Each library only pulls in its own
 # dependencies, so using one never costs anything for the others.
 
-all_libs = ['xxh', 'pcre2']
+all_libs = ['xxh', 'pcre2', 'json']
 
 requested = get_option('libs')
 enabled_libs = requested.length() > 0 ? requested : all_libs

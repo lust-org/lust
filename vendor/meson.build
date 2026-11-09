@@ -154,3 +154,35 @@ pcre2_dep = declare_dependency(
   include_directories: include_directories('.', is_system: true),
   link_args: ['-Wl,--exclude-libs,libpcre2.a'],
 )
+
+# ---------------------------------------------------------------------------
+# yyjson: a single C file (the upstream CMake/meson files are not used).
+# The features no library needs are compiled out: file I/O, the JSON
+# pointer/patch utilities and the incremental reader.
+# ---------------------------------------------------------------------------
+yyjson_inc = include_directories('yyjson/src', is_system: true)
+yyjson_lib = static_library(
+  'yyjson',
+  'yyjson/src/yyjson.c',
+  include_directories: yyjson_inc,
+  c_args: [
+    '-DYYJSON_DISABLE_FILE=1',
+    '-DYYJSON_DISABLE_UTILS=1',
+    '-DYYJSON_DISABLE_INCR_READER=1',
+    '-DNDEBUG',
+    '-ffile-prefix-map=@0@=.'.format(meson.project_source_root()),
+    '-ffile-prefix-map=@0@=.'.format(meson.project_build_root()),
+  ],
+  override_options: ['warning_level=0'],
+  gnu_symbol_visibility: 'hidden',
+  pic: true,
+  build_by_default: false,
+)
+# (yyjson's own API is tagged visibility("default"): keep it out of the
+# modules' and `lust`'s exports, only `luaopen_lust_*` may be exported)
+yyjson_dep = declare_dependency(
+  link_with: yyjson_lib,
+  include_directories: yyjson_inc,
+  compile_args: ['-DYYJSON_DISABLE_FILE=1', '-DYYJSON_DISABLE_UTILS=1', '-DYYJSON_DISABLE_INCR_READER=1'],
+  link_args: ['-Wl,--exclude-libs,libyyjson.a'],
+)
