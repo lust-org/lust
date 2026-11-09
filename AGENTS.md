@@ -3,6 +3,11 @@
 C libraries for LuaJIT. Each builds as a `.so` for stock luajit and as a
 static archive linked into the `lust` binary (LuaJIT + all libraries).
 
+## Docs
+
+`docs/` has one document per topic, named after it. Read one only
+when its topic comes up; new project-wide conventions go there too.
+
 ## Constraints
 
 - Never add, edit or remove files inside `vendor/*/**`. They are managed
@@ -73,8 +78,8 @@ static archive linked into the `lust` binary (LuaJIT + all libraries).
 - `./dev.py test` must pass (each lib: shared + static + lazy tests, and
   its `bench/` instruction counts within 3% of `bench/baseline.txt`).
   Don't re-record a baseline to hide a regression: only for intended
-  changes, committing the diff with them (see "Benchmark regressions" in
-  `README.md`). Every library needs `bench/*.lua` exercising its API.
-- Adding a library: see "Adding a library" in `README.md`.
+  changes, committing the diff with them (see
+  `docs/benchmark-regressions.md`). Every library needs `bench/*.lua`
+  exercising its API.
 - Commit each finished change separately; amend when asked to change a
   previous commit.

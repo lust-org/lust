@@ -135,7 +135,7 @@ endif
 foreach name : enabled_libs
   bench_dir = meson.project_source_root() / 'libs' / name / 'bench'
   if not fs.is_dir(bench_dir)
-    error('libs/@0@ has no bench/ (see "Adding a library" in README.md)'.format(name))
+    error('libs/@0@ has no bench/ (see docs/adding-a-library.md)'.format(name))
   endif
   # The vendored luajit (the VM build `lust` uses), not the one from PATH:
   # its counts must not depend on what the system has installed.

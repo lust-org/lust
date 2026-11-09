@@ -10,7 +10,8 @@ A collection of C libraries for LuaJIT, with two ways to use each of them:
   does not grow with the number of libraries: they are found through one
   lookup table when required. Libraries with a dynamic dependency are not
   linked in (that would make every start map it): `lust` loads their `.so`
-  from the install directory on demand, see "Adding a library".
+  from the install directory on demand, see
+  [Adding a library](docs/adding-a-library.md).
 
 ```lua
 local xxh = require "lust.xxh"
@@ -122,6 +123,7 @@ libs/ffi_shim.c     loads the embedded bytecode of the `ffi` libraries
 libs/lust/          defines the build targets of all libraries
 src/                the `lust` binary (lust.c + build of LuaJIT)
 examples/           runnable examples, one per library
+docs/               conventions and how-tos for working on lust
 tools/              helper used by the meson build
 tools/absl-sources.py  checks the Abseil source list of vendor/meson.build
 tests/              test harness + cross library tests
@@ -138,65 +140,7 @@ External dependencies are either **dynamic** (a normal `dependency()`
 resolved through pkg-config; they stay shared libraries at runtime), or
 **static**, from `vendor/`. Nothing is ever downloaded at build time.
 
-## Adding a library
+## Documentation
 
-1. Create `libs/<name>/` with:
-   - for a `capi` library: `<name>.c` exporting
-     `LUST_API int luaopen_lust_<name>(lua_State *L)`
-     (`#include "lust.h"`); for an `ffi` library: the plain C sources
-     (functions tagged `LUST_API`) and `<name>.lua`, see `libs/ffi_shim.c`,
-   - `meson.build` setting `lib_sources` and `lib_deps` (and for `ffi`:
-     `lib_kind = 'ffi'`, `lib_lua`); copy `libs/xxh/meson.build`
-     (no `ffi` library exists at the moment, see `libs/ffi_shim.c`),
-   - `test.lua` (see `libs/xxh/test.lua`),
-   - `doc-shortform.txt`: the API as succinct as possible (format: see
-     `tools/gen-help.py`, example: `libs/xxh/doc-shortform.txt`). It is
-     part of the usage text of `lust` (`lust --help`, section `LIBRARIES`; plain `-h` only points to it), and
-     `tests/test_doc.lua` checks that it lists exactly what the module
-     exports. The build fails without it,
-   - `bench/*.lua`: benchmarks of what the library provides, and their
-     `bench/baseline.txt` (see "Benchmark regressions"),
-   - optionally `examples/<name>.lua`.
-   - a library with a dynamic dependency: write it as `ffi` with
-     `ffi.load()`, or set `lib_embed = false` (`.so` only, loaded by
-     `lust` on demand). `tests/test_startup.py` guards `lust`'s startup.
-     C++ libraries need `lib_embed = false` too: the C++
-     runtime runs static constructors at startup.
-   - the Lua part of an `ffi` library must not contain table constructors
-     with named fields (`{ a = 1 }`, `{ a = f() }`): the compiled bytecode
-     would differ from build to build. Write `local t = {}; t.a = 1`
-     (`tests/test_bytecode.py`).
-2. Add `<name>` to `all_libs` in `libs/meson.build`.
-3. For a static dependency, add it to `vendor/vendor.toml`, vendor it
-   with `vendor.py` and declare a `<dep>_dep` for it in
-   `vendor/meson.build` (see `xxhash_dep`). Never add files inside
-   `vendor/<dep>/`. For a dependency that has no meson build (RE2/Abseil,
-   PCRE2) the source lists are kept in `vendor/meson.build`; after
-   upgrading RE2/Abseil run `tools/absl-sources.py --check`, after
-   upgrading PCRE2 compare the list with `vendor/pcre2/CMakeLists.txt`.
-
-The `.so`, the static archive for `lust`, install rules and both flavours
-of the tests are derived automatically.
-
-## Benchmark regressions
-
-Every library has benchmarks in `libs/<name>/bench/*.lua` (`_*.lua` are
-helpers): a fixed amount of work each (a few ms), asserting its result.
-`./dev.py test` runs each one in both flavours (vendored luajit + `.so`,
-and `lust`) and fails if its user space instructions (`perf stat -e
-instructions:u`, median of 3) differ more than 3% from
-`libs/<name>/bench/baseline.txt`. Instructions are free of timing noise
-(repeated runs differ well below 1%, whatever the CPU or its core type),
-so this works on a loaded machine, and all runs go in parallel, each
-process pinned to a CPU of its own. Without a usable `perf` only the
-results are checked; non release or sanitizer builds don't compare.
-
-The counts depend on the toolchain and system libraries. After an
-intended change (faster counts too, so the baseline stays tight), for a
-new library, or on another system, record them anew and commit the diff
-(counts within 1% of the recorded ones are kept, so noise doesn't churn
-the baselines):
-
-```sh
-./dev.py test --suite bench --test-args=--update
-```
+- [Adding a library](docs/adding-a-library.md)
+- [Benchmark regressions](docs/benchmark-regressions.md)
