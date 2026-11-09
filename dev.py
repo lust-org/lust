@@ -12,6 +12,7 @@ Examples:
   ./dev.py build crc                  # only libs/crc as lust/crc.so
   ./dev.py build lust -D libs=crc,xxh # configure which libs get built
   ./dev.py test
+  ./dev.py bench                      # C API vs FFI libraries, pinned to cpu 0
   ./dev.py install lust --prefix /usr # needs root, e.g. via sudo/pkexec
   ./dev.py install libs --destdir pkg # staging for distro packaging
 """
@@ -92,6 +93,13 @@ def test(args):
     run("meson", "test", "-C", args.builddir, *args.targets)
 
 
+def bench(args):
+    # Benchmark what is on disk: build everything first.
+    args.targets = ["all"]
+    compile_(args)
+    run(sys.executable, "bench/bench.py", "-B", args.builddir, *args.bench_args)
+
+
 def main():
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("-B", "--builddir", default="build", help="build directory (default: build)")
@@ -115,7 +123,16 @@ def main():
     p.add_argument("targets", nargs="*", help="meson test arguments, e.g. --suite crc")
     p.set_defaults(fn=test)
 
-    args = ap.parse_args()
+    p = sub.add_parser("bench", parents=[common], help="benchmark startup and speed (args go to bench/bench.py)")
+    p.set_defaults(fn=bench)
+
+    # `bench` forwards what it doesn't know (e.g. --only startup --cpu 2,
+    # see bench/bench.py -h); for the other commands that is an error.
+    args, extra = ap.parse_known_args()
+    if args.cmd == "bench":
+        args.bench_args = extra
+    elif extra:
+        ap.error(f"unrecognized arguments: {' '.join(extra)}")
     args.fn(args)
 
 

@@ -105,6 +105,7 @@ libs/lust/          defines the build targets of all libraries
 src/                the `lust` binary (lust.c + build of LuaJIT)
 tools/              helper used by the meson build
 tests/              test harness + cross library tests
+bench/              startup / steady state benchmark (`./dev.py bench`)
 vendor/luajit/      LuaJIT (managed by vendor.py, never edit)
 vendor/xxhash/      xxHash (managed by vendor.py, never edit)
 vendor/meson.build  build definitions of the vendored dependencies
@@ -134,3 +135,23 @@ resolved through pkg-config; they stay shared libraries at runtime), or
 
 The `.so`, the static archive for `lust`, install rules and both flavours
 of the tests are derived automatically.
+
+## Benchmarking
+
+`./dev.py bench` builds everything and compares `lust.xxh` (C API) with
+`lust.xxhffi` (FFI), each as a `.so` in a plain luajit and linked into
+`lust`, pinned to CPU 0 (`--cpu N` to change; `--libs a,b` to compare other
+libraries with the same API; `--only startup|throughput`):
+
+- **startup**: the interpreter is spawned hundreds of times with
+  `-e 'require "lust.<lib>"'`, interleaved across variants, and the cost
+  of the require is the difference to an empty chunk. User space
+  instruction counts (via `perf`, if usable) are noise free.
+- **steady state**: `bench/throughput.lua` hashes 8 B to 64 KiB inputs;
+  several processes per variant, because JIT trace layout varies by run.
+
+For stable numbers use the `performance` cpufreq governor
+(`sudo cpupower frequency-set -g performance`), disable turbo/boost, close
+other load, or isolate the CPU (`isolcpus=0` on the kernel command line).
+The plain luajit used is the vendored build (`build/vendor/luajit`), so
+that both sides run the same VM binary; `--luajit` selects another one.

@@ -38,6 +38,7 @@ static archive linked into the `lust` binary (LuaJIT + all libraries).
 ## Workflow
 
 - `./dev.py test` must pass (each lib: shared + static + lazy tests).
+- `./dev.py bench` compares flavours (CPU 0 pinned); keep it working.
 - Adding a library: see "Adding a library" in `README.md`.
 - Commit each finished change separately; amend when asked to change a
   previous commit.
