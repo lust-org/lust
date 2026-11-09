@@ -70,6 +70,8 @@ foreach name : enabled_libs
       'deps': lib_deps,
       # (missing file: meson fails at configure time)
       'doc': files(name / 'doc-shortform.txt'),
+      # (as a path for command lines: File.full_path() needs meson 1.4)
+      'doc_path': meson.current_source_dir() / name / 'doc-shortform.txt',
     },
   }
 endforeach

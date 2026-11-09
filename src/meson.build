@@ -35,7 +35,7 @@ lust_libs_h = configure_file(
 help_args = []
 help_docs = []
 foreach name, info : lib_infos
-  help_args += '@0@=@1@'.format(name, info['doc'][0].full_path())
+  help_args += '@0@=@1@'.format(name, info['doc_path'])
   help_docs += info['doc']
 endforeach
 lust_help_h = custom_target(

@@ -85,7 +85,7 @@ endif
 # and `lust`'s usage text contains them.
 doc_args = []
 foreach name, info : lib_infos
-  doc_args += '@0@=@1@'.format(name, info['doc'][0].full_path())
+  doc_args += '@0@=@1@'.format(name, info['doc_path'])
 endforeach
 test(
   'library documentation',
