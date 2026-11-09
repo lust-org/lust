@@ -96,6 +96,47 @@ if lust_feature.allowed()
   )
 endif
 
+# Benchmark regressions: every library's libs/<name>/bench/*.lua, in both
+# flavours, must stay within a few percent of the instruction counts in
+# libs/<name>/bench/baseline.txt (see the script). The counts are only
+# meaningful for the default optimized build.
+bench_skip = []
+if get_option('buildtype') != 'release'
+  bench_skip = ['--skip', 'buildtype is not release']
+elif '@0@'.format(get_option('b_sanitize')) not in ['none', '[]']
+  # (a string up to meson 1.7, an array from 1.8 on)
+  bench_skip = ['--skip', 'built with sanitizers']
+elif get_option('luajit_xcflags') != ''
+  bench_skip = ['--skip', 'custom luajit_xcflags']
+endif
+foreach name : enabled_libs
+  bench_dir = meson.project_source_root() / 'libs' / name / 'bench'
+  if not fs.is_dir(bench_dir)
+    error('libs/@0@ has no bench/ (see "Adding a library" in README.md)'.format(name))
+  endif
+  # The vendored luajit (the VM build `lust` uses), not the one from PATH:
+  # its counts must not depend on what the system has installed.
+  flavours = ['--flavour', 'luajit', luajit_exe, shared_cpath]
+  if lust_feature.allowed()
+    flavours += [
+      '--flavour',
+      'lust',
+      lust_exe,
+      lib_infos[name]['embed'] ? nowhere_cpath : shared_cpath,
+    ]
+  endif
+  test(
+    name + ' (bench)',
+    py,
+    args: [files('test_bench.py'), bench_dir] + flavours + bench_skip,
+    depends: [shared_mods],
+    suite: ['bench', name],
+    # Every benchmark runs RUNS times per flavour (in parallel, but the
+    # machine may be busy).
+    timeout: 300,
+  )
+endforeach
+
 # The embedded bytecode of `ffi` libraries has to be reproducible.
 ffi_luas = []
 foreach name, info : lib_infos

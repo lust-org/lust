@@ -69,7 +69,11 @@ static archive linked into the `lust` binary (LuaJIT + all libraries).
 
 ## Workflow
 
-- `./dev.py test` must pass (each lib: shared + static + lazy tests).
+- `./dev.py test` must pass (each lib: shared + static + lazy tests, and
+  its `bench/` instruction counts within 3% of `bench/baseline.txt`).
+  Don't re-record a baseline to hide a regression: only for intended
+  changes, committing the diff with them (see "Benchmark regressions" in
+  `README.md`). Every library needs `bench/*.lua` exercising its API.
 - `./dev.py bench` compares flavours (CPU 0 pinned); keep it working.
 - Adding a library: see "Adding a library" in `README.md`.
 - Commit each finished change separately; amend when asked to change a
