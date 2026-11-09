@@ -19,13 +19,13 @@
  *   for user, host in re:gmatch(s) do ... end
  *   re:gsub("bob@example.com", "\\2 at \\1")   --> "example at bob", 1
  *   pcre2.new("a.c", {caseless = true, dotall = true})
- *   pcre2.new("(") --> nil, "missing closing parenthesis (at offset 1)"
+ *   pcre2.new("(") --> nil, "missing closing parenthesis (at position 2)"
  *   pcre2.quote("a.b")                    --> "a\\.b"
  *   pcre2.version                         --> "10.49 2026-09-28"
  *
- * Positions are 1-based byte offsets like in string.find; `init` may be
- * negative. A group that did not take part in a match is `false`. A regexp
- * is garbage collected like any other value.
+ * Positions (also in error messages) are 1-based byte offsets like in
+ * string.find; `init` may be negative. A group that did not take part in a
+ * match is `false`. A regexp is garbage collected like any other value.
  *
  * Why the Lua C API and not the FFI: requiring an FFI library costs the
  * FFI itself plus a `cdef`, bytecode to load and a symbol lookup per
@@ -180,8 +180,12 @@ static int l_new(lua_State *L) {
     char msg[200];
     if (pcre2_get_error_message(code, (PCRE2_UCHAR *)msg, sizeof msg) < 0)
       strcpy(msg, "compile error");
+    /* erroff is the 0-based byte offset where PCRE2 detected the error,
+     * which is often right behind the offending character ("a)" -> 2).
+     * Report it as a 1-based position like all other positions, without
+     * guessing an adjustment per error code. */
     lua_pushnil(L);
-    lua_pushfstring(L, "%s (at offset %d)", msg, (int)erroff);
+    lua_pushfstring(L, "%s (at position %d)", msg, (int)erroff + 1);
     return 2;
   }
 
