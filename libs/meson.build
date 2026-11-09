@@ -13,6 +13,11 @@
 #          bytecode and embedded, and only loaded on `require` (see
 #          libs/xxhffi/).
 #
+#      Every library also MUST have a doc-shortform.txt: its API as
+#      succinct as possible, which becomes part of `lust`'s help text
+#      (format: see tools/gen-help.py). tests/test_doc.lua checks that it
+#      lists exactly what the module exports.
+#
 #      Optional `lib_embed = false` (default true) keeps the library out of
 #      `lust`: it is then only built as a .so, which `lust` loads on demand
 #      from its install cmoddir. REQUIRED for a library that links a
@@ -63,6 +68,8 @@ foreach name : enabled_libs
       'lua': lib_lua,
       'embed': lib_embed,
       'deps': lib_deps,
+      # (missing file: meson fails at configure time)
+      'doc': files(name / 'doc-shortform.txt'),
     },
   }
 endforeach

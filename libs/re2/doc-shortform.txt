@@ -1,0 +1,43 @@
+Linear time matching, safe for untrusted patterns. Same methods as pcre2.
+
+new(pattern [, opts]): re | nil, err
+  Compiles an RE2 pattern (UTF-8). opts: boolean flags literal, caseless,
+  longest, posix, never_nl, dot_nl, never_capture, perl_classes,
+  word_boundary, one_line, latin1; number max_mem
+
+quote(str): str
+  Escapes str so that it matches literally
+
+re:test(s [, init]): bool
+  Does s match? init is 1-based, may be negative
+
+re:find(s [, init]): start, end, captures... | nil
+  Like string.find; a group not taking part is false
+
+re:match(s [, init]): captures... | match | nil
+  Like string.match
+
+re:fullmatch(s): captures... | match | nil
+  Like match, but must match all of s
+
+re:captures(s [, init]): table | nil
+  [0] is the match, [1..n] the groups, named groups also by name
+
+re:gmatch(s): iterator
+  Yields what match returns for every match
+
+re:gsub(s, repl [, max]): str, count
+  repl is a string (\0 match, \1..\9 groups), a function(captures...) or a
+  table; false/nil keeps the match
+
+re:groups(): number
+  Number of capturing groups
+
+re:groupindex(): table
+  Name -> index of the named groups
+
+re:pattern(): str
+  The source pattern
+
+re:program_size(): number
+  Size of the compiled program (a measure of complexity)

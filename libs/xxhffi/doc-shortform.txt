@@ -1,0 +1,10 @@
+Same API as xxh, bound through the FFI
+
+xxh32(str [, seed]): number
+  32 bit hash of str, seed in [0, 2^32)
+
+xxh64(str [, seed]): str
+  64 bit hash of str as 16 hex digits, seed in [0, 2^53)
+
+version(): str
+  xxHash version

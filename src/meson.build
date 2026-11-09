@@ -30,6 +30,21 @@ lust_libs_h = configure_file(
   configuration: conf,
 )
 
+# 2b. The LIBRARIES section of the usage text: the doc-shortform.txt of every
+#     enabled library (also the ones that are only loadable as .so).
+help_args = []
+help_docs = []
+foreach name, info : lib_infos
+  help_args += '@0@=@1@'.format(name, info['doc'][0].full_path())
+  help_docs += info['doc']
+endforeach
+lust_help_h = custom_target(
+  'lust_help.h',
+  input: help_docs,
+  output: 'lust_help.h',
+  command: [py, files('../tools/gen-help.py'), '@OUTPUT@'] + help_args,
+)
+
 # 3. LuaJIT's stock main() (via lust_main.c, which only replaces the version
 #    banner), with luaL_openlibs redirected to lust_openlibs().
 #    Compiled in its own target so the defines don't leak into lust.c.
@@ -37,6 +52,7 @@ lust_libs_h = configure_file(
 luajit_main = static_library(
   'luajit_main',
   'lust_main.c',
+  lust_help_h,
   luajit_build[2], # generated luajit.h, found via the build dir include
   c_args: [
     '-DluaL_openlibs=lust_openlibs',

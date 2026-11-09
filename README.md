@@ -156,6 +156,11 @@ resolved through pkg-config; they stay shared libraries at runtime), or
      `lib_kind = 'ffi'`, `lib_lua`); copy `libs/crc/meson.build` or
      `libs/xxhffi/meson.build`,
    - `test.lua` (see `libs/crc/test.lua`),
+   - `doc-shortform.txt`: the API as succinct as possible (format: see
+     `tools/gen-help.py`, example: `libs/xxh/doc-shortform.txt`). It is
+     part of the usage text of `lust` (`lust --help`, section `LIBRARIES`; plain `-h` only points to it), and
+     `tests/test_doc.lua` checks that it lists exactly what the module
+     exports. The build fails without it,
    - `bench/*.lua`: benchmarks of what the library provides, and their
      `bench/baseline.txt` (see "Benchmark regressions"),
    - optionally `examples/<name>.lua`.

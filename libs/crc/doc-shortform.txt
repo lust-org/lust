@@ -1,0 +1,8 @@
+crc32(str [, crc]): number
+  CRC-32 of str, crc continues a previous checksum
+
+adler32(str [, adler]): number
+  Adler-32 of str, adler continues a previous checksum
+
+zlib_version(): str
+  Version of the system zlib

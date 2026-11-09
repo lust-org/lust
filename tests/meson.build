@@ -81,6 +81,29 @@ if enabled_libs.length() > 1
   endif
 endif
 
+# Every library's doc-shortform.txt lists exactly what the module exports,
+# and `lust`'s usage text contains them.
+doc_args = []
+foreach name, info : lib_infos
+  doc_args += '@0@=@1@'.format(name, info['doc'][0].full_path())
+endforeach
+test(
+  'library documentation',
+  lust_feature.allowed() ? lust_exe : luajit,
+  args: [files('test_doc.lua')] + doc_args,
+  env: {'LUA_PATH': lua_path, 'LUA_CPATH': shared_cpath},
+  depends: [shared_mods],
+  suite: ['doc'],
+)
+if lust_feature.allowed()
+  test(
+    'usage text',
+    py,
+    args: [files('test_usage.py'), lust_exe] + doc_args,
+    suite: ['doc'],
+  )
+endif
+
 # Startup budget of `lust` compared to plain luajit (see the script).
 if lust_feature.allowed()
   test(
