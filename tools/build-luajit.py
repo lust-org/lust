@@ -3,11 +3,11 @@
 
 LuaJIT's makefile only supports in-tree builds. To keep the vendored
 source tree pristine and to make the build directory self-contained, the
-`src/` and `dynasm/` trees are mirrored into a work directory below the meson build dir and
-built there. Mirroring only copies files that changed, so repeated runs
+`src/` and `dynasm/` trees are mirrored into a work directory below the meson build dir
+and built there. Mirroring only copies files that changed, so repeated runs
 are incremental and `make` has nothing to do when nothing changed.
 
-This script is invoked by meson (see src/meson.build), not by hand.
+This script is invoked by meson (see vendor/meson.build), not by hand.
 """
 
 import argparse
@@ -46,6 +46,7 @@ def main() -> int:
     ap.add_argument("--out-lib", required=True, type=Path)
     ap.add_argument("--out-vmdef", required=True, type=Path)
     ap.add_argument("--out-header", required=True, type=Path)
+    ap.add_argument("--out-bin", required=True, type=Path)
     args = ap.parse_args()
 
     src, work = args.src.resolve(), args.work.resolve()
@@ -89,6 +90,10 @@ def main() -> int:
     update_if_changed(work / "src" / "jit" / "vmdef.lua", args.out_vmdef)
     # luajit.h carries the generated version macros, luajit.c includes it.
     update_if_changed(work / "src" / "luajit.h", args.out_header)
+    # The interpreter built along with it runs at build time (`luajit -b`
+    # turns the Lua part of FFI libraries into bytecode).
+    update_if_changed(work / "src" / "luajit", args.out_bin)
+    args.out_bin.chmod(0o755)
     return 0
 
 

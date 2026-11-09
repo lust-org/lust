@@ -16,6 +16,10 @@ static archive linked into the `lust` binary (LuaJIT + all libraries).
 - `.so` modules must not link libluajit: only the LuaJIT headers are used,
   symbols resolve from the host interpreter. Keep `b_lundef=false`.
 - Export only `luaopen_lust_<name>` (`LUST_API`); everything else hidden.
+  `ffi` libraries (`lib_kind = 'ffi'`, Lua part compiled to bytecode by
+  the vendored LuaJIT and embedded by `libs/ffi_shim.c`) additionally
+  export the C functions their Lua part binds, and must keep them linked
+  (they are only reached via dlsym).
 - Requiring one library must not load any other (`tests/test_lazy.lua`).
 - Stock luajit finds `require "lust.<x>"` at `<cpath>/lust/<x>.so`, so
   module output names/dirs must keep that layout.

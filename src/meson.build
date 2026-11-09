@@ -1,33 +1,8 @@
 # The `lust` interpreter: LuaJIT + all enabled libraries, statically linked.
 
-py = find_program('python3')
-cc = meson.get_compiler('c')
-datadir = get_option('prefix') / get_option('datadir') / 'lust'
-
-# 1. LuaJIT's own (make based) build -> libluajit.a, the generated
-#    jit/vmdef.lua and the generated luajit.h (version macros).
-#    Always "stale": make decides whether there is work to do, and the script
-#    leaves the outputs untouched if nothing changed (no needless relinking).
-luajit_build = custom_target(
-  'luajit',
-  output: ['libluajit.a', 'vmdef.lua', 'luajit.h'],
-  command: [
-    py,
-    files('../tools/build-luajit.py'),
-    '--src', luajit_src,
-    '--work', meson.current_build_dir() / 'luajit-tree',
-    '--cc', ' '.join(cc.cmd_array()),
-    '--xcflags', get_option('luajit_xcflags'),
-    '--out-lib', '@OUTPUT0@',
-    '--out-vmdef', '@OUTPUT1@',
-    '--out-header', '@OUTPUT2@',
-  ],
-  build_always_stale: true,
-  install: true,
-  install_dir: [false, datadir / 'jit', false],
-  install_tag: 'lust',
-)
-# The rest of the jit.* Lua modules are static files in the LuaJIT tree.
+# 1. LuaJIT's own build (libluajit.a, luajit.h, vmdef.lua) is defined in
+#    vendor/meson.build as `luajit_build`.
+#    The rest of the jit.* Lua modules are static files in the LuaJIT tree.
 install_subdir(
   luajit_src / 'src' / 'jit',
   install_dir: datadir,

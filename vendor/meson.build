@@ -18,6 +18,35 @@ if not fs.exists(luajit_src / 'src' / 'lua.h')
 endif
 luajit_inc = include_directories('luajit/src', is_system: true)
 
+# LuaJIT's own (make based) build -> libluajit.a, the generated
+# jit/vmdef.lua, the generated luajit.h (version macros) and the luajit
+# interpreter itself (used at build time, e.g. to compile FFI libraries
+# to bytecode).
+# Always "stale": make decides whether there is work to do, and the script
+# leaves the outputs untouched if nothing changed (no needless relinking).
+luajit_build = custom_target(
+  'luajit',
+  output: ['libluajit.a', 'vmdef.lua', 'luajit.h', 'luajit'],
+  command: [
+    py,
+    files('../tools/build-luajit.py'),
+    '--src', luajit_src,
+    '--work', meson.current_build_dir() / 'luajit-tree',
+    '--cc', ' '.join(cc.cmd_array()),
+    '--xcflags', get_option('luajit_xcflags'),
+    '--out-lib', '@OUTPUT0@',
+    '--out-vmdef', '@OUTPUT1@',
+    '--out-header', '@OUTPUT2@',
+    '--out-bin', '@OUTPUT3@',
+  ],
+  build_always_stale: true,
+  # Only the vmdef.lua is installed, and only along with `lust`.
+  install: lust_feature.allowed(),
+  install_dir: [false, datadir / 'jit', false, false],
+  install_tag: 'lust',
+)
+luajit_exe = luajit_build[3]
+
 # xxHash: static archive, PIC so it can be absorbed into the shared
 # modules. Only built when something links against it.
 xxhash_lib = static_library(

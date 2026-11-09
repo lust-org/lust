@@ -13,6 +13,12 @@ project(
   ],
 )
 
+py = find_program('python3')
+cc = meson.get_compiler('c')
+lust_feature = get_option('lust')
+# Where the Lua part of the runtime (jit.* modules) is installed.
+datadir = get_option('prefix') / get_option('datadir') / 'lust'
+
 # Vendored dependencies first: they provide luajit_src, luajit_inc, ...
 subdir('vendor')
 
@@ -21,8 +27,6 @@ subdir('vendor')
 lust_dep = declare_dependency(
   include_directories: [luajit_inc, include_directories('include')],
 )
-
-lust_feature = get_option('lust')
 
 subdir('libs')
 if lust_feature.allowed()

@@ -18,6 +18,18 @@ print(crc.crc32("123456789")) --> 3421780262
 | ----------- | ------------------- | --------------------------------------- |
 | `lust.crc`  | zlib checksums      | system zlib, linked dynamically         |
 | `lust.xxh`  | xxHash              | `vendor/xxhash`, linked statically      |
+| `lust.xxhffi` | xxHash, same API  | as above, but bound through the FFI     |
+
+Libraries come in two kinds (`lib_kind` in their `meson.build`):
+
+- `capi`: classic Lua C API module (`lust.crc`, `lust.xxh`).
+- `ffi`: [static FFI bindings](https://evo-lua.github.io/docs/background-information/luajit/static-ffi-bindings/).
+  The C code is plain C that knows nothing about Lua and just exports
+  functions. A Lua file binds them with `ffi.cdef`; it is compiled to
+  bytecode at build time, embedded, and only loaded on `require`
+  (`lust.xxhffi`). The FFI calls are visible to the JIT, which is the main
+  point. The embedded bytecode must match the LuaJIT that loads it
+  (version and GC64), otherwise `require` fails with a clear error.
 
 ## Building
 
@@ -42,7 +54,7 @@ git clone <this repo> && cd lust
 (`meson setup build && meson compile -C build && meson test -C build`).
 Meson options (`./dev.py build -D name=value`, see `meson_options.txt`):
 
-- `libs=crc,xxh`: build only these libraries (default: all). This also
+- `libs=crc,xxh,xxhffi`: build only these libraries (default: all). This also
   decides which libraries get linked into `lust`.
 - `lust=disabled`: don't build the `lust` binary (skips building LuaJIT).
 - `cmoddir=...`: where the `.so` files go (default `<libdir>/lua/5.1`).
@@ -88,6 +100,7 @@ meson.build         project, ties everything together
 meson_options.txt
 include/lust.h      header shared by all libraries
 libs/<name>/        one directory per library: <name>.c, test.lua, meson.build
+libs/ffi_shim.c     loads the embedded bytecode of the `ffi` libraries
 libs/lust/          defines the build targets of all libraries
 src/                the `lust` binary (lust.c + build of LuaJIT)
 tools/              helper used by the meson build
@@ -105,10 +118,13 @@ resolved through pkg-config; they stay shared libraries at runtime), or
 ## Adding a library
 
 1. Create `libs/<name>/` with:
-   - `<name>.c` exporting `LUST_API int luaopen_lust_<name>(lua_State *L)`
-     (`#include "lust.h"`),
-   - `meson.build` setting `lib_sources` and `lib_deps`
-     (copy `libs/crc/meson.build`),
+   - for a `capi` library: `<name>.c` exporting
+     `LUST_API int luaopen_lust_<name>(lua_State *L)`
+     (`#include "lust.h"`); for an `ffi` library: the plain C sources
+     (functions tagged `LUST_API`) and `<name>.lua`, see `libs/xxhffi`,
+   - `meson.build` setting `lib_sources` and `lib_deps` (and for `ffi`:
+     `lib_kind = 'ffi'`, `lib_lua`); copy `libs/crc/meson.build` or
+     `libs/xxhffi/meson.build`,
    - `test.lua` (see `libs/crc/test.lua`).
 2. Add `<name>` to `all_libs` in `libs/meson.build`.
 3. For a static dependency, add it to `vendor/vendor.toml`, vendor it
