@@ -23,6 +23,12 @@ static archive linked into the `lust` binary (LuaJIT + all libraries).
   it into the build dir and builds there.
 - Install locations must work on Arch and Ubuntu: use meson's `libdir`
   (differs per distro), keep `cmoddir` overridable.
+- Builds are deterministic: a clean rebuild yields byte-identical `lust`,
+  `.so` files, `libluajit.a` and `vmdef.lua`, regardless of build dir or
+  checkout path. Do not embed timestamps, absolute paths, hostnames or
+  other ambient state (`__DATE__`, `__TIME__`, `-g` paths, ...). The only
+  stamp is LuaJIT's version, from the last commit touching
+  `vendor/luajit`. Check by building twice (`cmp`) after build changes.
 - `./dev.py` stays a thin shim over meson (`build`, `install`, `test`).
 
 ## Workflow
