@@ -12,7 +12,12 @@ static archive linked into the `lust` binary (LuaJIT + all libraries).
   from `vendor/`. Nothing is downloaded at build time.
 - Build system is meson only, `meson_version: '>=1.3.0'` (Ubuntu 24.04).
   Do not use newer-only features (e.g. `build_subdir` needs 1.10).
-- C11 for our code. Only upstream `luajit.c` is built as `gnu11`.
+- C11 for our code. Only upstream `luajit.c` is built as `gnu11`. The one
+  exception is C++17 for code that wraps C++ dependencies (`libs/re2`:
+  `extern "C"` shim over RE2) and for the vendored RE2/Abseil themselves.
+  A C++ library links the C++ runtime statically (`cpp_rt_dep`) and is
+  `lib_embed = false`: libstdc++'s static constructors (iostream, locale,
+  exception pool) cost ~110k instructions per start.
 - `.so` modules must not link libluajit: only the LuaJIT headers are used,
   symbols resolve from the host interpreter. Keep `b_lundef=false`.
 - Export only `luaopen_lust_<name>` (`LUST_API`); everything else hidden.
@@ -38,6 +43,10 @@ static archive linked into the `lust` binary (LuaJIT + all libraries).
 - Requiring one library must not load any other (`tests/test_lazy.lua`).
 - Stock luajit finds `require "lust.<x>"` at `<cpath>/lust/<x>.so`, so
   module output names/dirs must keep that layout.
+- The Lua part of an `ffi` library must not use table constructors with
+  named fields: LuaJIT dumps them in a per process randomized order, so
+  the embedded bytecode would not be reproducible
+  (`tests/test_bytecode.py`).
 - Do not modify the vendored LuaJIT tree. `tools/build-luajit.py` mirrors
   it into the build dir and builds there.
 - Install locations must work on Arch and Ubuntu: use meson's `libdir`

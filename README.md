@@ -22,6 +22,7 @@ print(crc.crc32("123456789")) --> 3421780262
 | `lust.crc`  | zlib checksums      | system zlib, linked dynamically (`.so` only, not in `lust`) |
 | `lust.xxh`  | xxHash              | `vendor/xxhash`, linked statically      |
 | `lust.xxhffi` | xxHash, same API  | as above, but bound through the FFI     |
+| `lust.re2`  | RE2 regular expressions | `vendor/re2` + `vendor/abseil`, linked statically (`.so` only, not in `lust`) |
 
 Libraries come in two kinds (`lib_kind` in their `meson.build`):
 
@@ -38,14 +39,15 @@ Libraries come in two kinds (`lib_kind` in their `meson.build`):
 
 ## Building
 
-Requirements: `meson`, `ninja`, a C compiler, `make`, `git`, `python3`
-and the dev files of the dynamic dependencies (currently zlib).
+Requirements: `meson`, `ninja`, a C and a C++17 compiler (RE2), `make`,
+`git`, `python3` and the dev files of the dynamic dependencies (currently
+zlib).
 
 ```sh
 # Arch Linux
 sudo pacman -S --needed meson ninja gcc make git python zlib
 # Ubuntu
-sudo apt install meson ninja-build gcc make git python3 zlib1g-dev
+sudo apt install meson ninja-build gcc g++ make git python3 zlib1g-dev
 
 git clone <this repo> && cd lust
 ./dev.py build            # everything
@@ -59,7 +61,7 @@ git clone <this repo> && cd lust
 (`meson setup build && meson compile -C build && meson test -C build`).
 Meson options (`./dev.py build -D name=value`, see `meson_options.txt`):
 
-- `libs=crc,xxh,xxhffi`: build only these libraries (default: all). This also
+- `libs=crc,xxh,xxhffi,re2`: build only these libraries (default: all). This also
   decides which libraries get linked into `lust`.
 - `lust=disabled`: don't build the `lust` binary (skips building LuaJIT).
 - `cmoddir=...`: where the `.so` files go (default `<libdir>/lua/5.1`).
@@ -78,8 +80,10 @@ build/src/lust -e 'print(require("lust.xxh").xxh64("abc"))'
 ```sh
 build/src/lust examples/xxh.lua
 build/src/lust examples/xxhffi.lua
-# crc is not linked into `lust`, so it is looked up in the build tree:
+# crc and re2 are not linked into `lust`, so they are looked up in the
+# build tree:
 LUA_CPATH="$PWD/build/libs/?.so" build/src/lust examples/crc.lua
+LUA_CPATH="$PWD/build/libs/?.so" build/src/lust examples/re2.lua
 ```
 
 ## Installing
@@ -119,10 +123,13 @@ libs/lust/          defines the build targets of all libraries
 src/                the `lust` binary (lust.c + build of LuaJIT)
 examples/           runnable examples, one per library
 tools/              helper used by the meson build
+tools/absl-sources.py  checks the Abseil source list of vendor/meson.build
 tools/bench/        startup / steady state benchmark (`./dev.py bench`)
 tests/              test harness + cross library tests
 vendor/luajit/      LuaJIT (managed by vendor.py, never edit)
 vendor/xxhash/      xxHash (managed by vendor.py, never edit)
+vendor/re2/         RE2 (managed by vendor.py, never edit)
+vendor/abseil/      Abseil, which RE2 needs (managed by vendor.py, never edit)
 vendor/meson.build  build definitions of the vendored dependencies
 vendor/vendor.toml  upstream repos + revisions of the above
 ```
@@ -146,11 +153,19 @@ resolved through pkg-config; they stay shared libraries at runtime), or
    - a library with a dynamic dependency: write it as `ffi` with
      `ffi.load()`, or set `lib_embed = false` (`.so` only, loaded by
      `lust` on demand). `tests/test_startup.py` guards `lust`'s startup.
+     C++ libraries (`libs/re2`) need `lib_embed = false` too: the C++
+     runtime runs static constructors at startup.
+   - the Lua part of an `ffi` library must not contain table constructors
+     with named fields (`{ a = 1 }`, `{ a = f() }`): the compiled bytecode
+     would differ from build to build. Write `local t = {}; t.a = 1`
+     (`tests/test_bytecode.py`).
 2. Add `<name>` to `all_libs` in `libs/meson.build`.
 3. For a static dependency, add it to `vendor/vendor.toml`, vendor it
    with `vendor.py` and declare a `<dep>_dep` for it in
    `vendor/meson.build` (see `xxhash_dep`). Never add files inside
-   `vendor/<dep>/`.
+   `vendor/<dep>/`. For a dependency that has no meson build (RE2/Abseil)
+   the source lists are kept in `vendor/meson.build`; after upgrading them
+   run `tools/absl-sources.py --check`.
 
 The `.so`, the static archive for `lust`, install rules and both flavours
 of the tests are derived automatically.

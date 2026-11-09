@@ -1,10 +1,12 @@
 project(
   'lust',
   'c',
+  'cpp',
   version: '0.1.0',
   meson_version: '>=1.3.0',
   default_options: [
     'c_std=c11',
+    'cpp_std=c++17',
     'warning_level=2',
     'buildtype=release',
     # Loadable modules resolve the Lua C API from the host interpreter at
