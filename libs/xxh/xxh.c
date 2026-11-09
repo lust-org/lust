@@ -6,7 +6,7 @@
  *   xxh.xxh64("abc")        --> "44bc2cf5ad770999" (hex: 64 bit do not fit
  *                               a Lua number)
  *   xxh.xxh64("abc", seed)
- *   xxh.version()           --> "0.8.3"
+ *   xxh.version()           --> "0.8.4"
  */
 #include <stdio.h>
 

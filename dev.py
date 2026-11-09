@@ -42,9 +42,6 @@ def library_names():
 
 def configure(args):
     """Create or update the build directory so it matches the options."""
-    if not (ROOT / "vendor/luajit/src/lua.h").exists():
-        run("git", "submodule", "update", "--init", "vendor/luajit")
-
     opts = [f"-D{d}" for d in args.define]
     if args.prefix:
         opts.append(f"--prefix={args.prefix}")

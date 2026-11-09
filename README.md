@@ -30,7 +30,7 @@ sudo pacman -S --needed meson ninja gcc make git python zlib
 # Ubuntu
 sudo apt install meson ninja-build gcc make git python3 zlib1g-dev
 
-git clone --recursive <this repo> && cd lust   # or: git submodule update --init
+git clone <this repo> && cd lust
 ./dev.py build            # everything
 ./dev.py build lust       # only the `lust` binary  -> build/src/lust
 ./dev.py build libs       # all libraries as .so    -> build/libs/lust/*.so
@@ -92,8 +92,10 @@ libs/lust/          defines the build targets of all libraries
 src/                the `lust` binary (lust.c + build of LuaJIT)
 tools/              helper used by the meson build
 tests/              test harness + cross library tests
-vendor/luajit/      LuaJIT (git submodule)
-vendor/xxhash/      xxHash (copied in)
+vendor/luajit/      LuaJIT (managed by vendor.py, never edit)
+vendor/xxhash/      xxHash (managed by vendor.py, never edit)
+vendor/meson.build  build definitions of the vendored dependencies
+vendor/vendor.toml  upstream repos + revisions of the above
 ```
 
 External dependencies are either **dynamic** (a normal `dependency()`
@@ -109,9 +111,10 @@ resolved through pkg-config; they stay shared libraries at runtime), or
      (copy `libs/crc/meson.build`),
    - `test.lua` (see `libs/crc/test.lua`).
 2. Add `<name>` to `all_libs` in `libs/meson.build`.
-3. For a static dependency, vendor it as `vendor/<dep>/` with a
-   `meson.build` declaring a `<dep>_dep` (see `vendor/xxhash`) and add it
-   to `vendor/meson.build`.
+3. For a static dependency, add it to `vendor/vendor.toml`, vendor it
+   with `vendor.py` and declare a `<dep>_dep` for it in
+   `vendor/meson.build` (see `xxhash_dep`). Never add files inside
+   `vendor/<dep>/`.
 
 The `.so`, the static archive for `lust`, install rules and both flavours
 of the tests are derived automatically.

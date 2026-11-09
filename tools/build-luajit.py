@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the static LuaJIT runtime (libluajit.a) out of the vendored sources.
 
-LuaJIT's makefile only supports in-tree builds. To keep the (submodule)
+LuaJIT's makefile only supports in-tree builds. To keep the vendored
 source tree pristine and to make the build directory self-contained, the
 `src/` and `dynasm/` trees are mirrored into a work directory below the meson build dir and
 built there. Mirroring only copies files that changed, so repeated runs
@@ -51,8 +51,7 @@ def main() -> int:
     src, work = args.src.resolve(), args.work.resolve()
     if not (src / "src" / "lj_arch.h").exists():
         sys.exit(
-            f"error: {src} is empty. Fetch the vendored sources first:\n"
-            "       git submodule update --init vendor/luajit"
+            f"error: {src} has no LuaJIT sources (see vendor/vendor.toml)"
         )
 
     work.mkdir(parents=True, exist_ok=True)
@@ -60,10 +59,12 @@ def main() -> int:
     for sub in ("src", "dynasm"):
         mirror(src / sub, work / sub)
 
-    # The version string (`LuaJIT 2.1.<relver>`) normally comes from git,
-    # which is not available in the mirrored tree: hand it over as `.relver`.
+    # The version string (`LuaJIT 2.1.<relver>`) normally comes from the
+    # upstream git history, which the vendored copy does not carry. Use the
+    # commit time of the last change to vendor/luajit instead, so the
+    # string is stable and changes whenever the vendored copy is updated.
     git = subprocess.run(
-        ["git", "-C", str(src), "show", "-s", "--format=%ct"],
+        ["git", "-C", str(src), "log", "-1", "--format=%ct", "--", "."],
         capture_output=True,
         text=True,
     )
