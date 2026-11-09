@@ -1,0 +1,31 @@
+option(
+  'libs',
+  type: 'array',
+  value: [],
+  description: 'Libraries to build (as .so modules and, if enabled, into ' +
+    'lust). Empty means all of them.',
+)
+
+option(
+  'lust',
+  type: 'feature',
+  value: 'enabled',
+  description: 'Build the `lust` interpreter: LuaJIT with the selected ' +
+    'libraries statically linked in',
+)
+
+option(
+  'cmoddir',
+  type: 'string',
+  value: '',
+  description: 'Install directory for the .so modules. Defaults to ' +
+    '<libdir>/lua/5.1, which is on the default package.cpath of stock luajit',
+)
+
+option(
+  'luajit_xcflags',
+  type: 'string',
+  value: '',
+  description: 'Extra CFLAGS used when building the LuaJIT runtime inside ' +
+    'lust (e.g. -DLUAJIT_ENABLE_LUA52COMPAT)',
+)
