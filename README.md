@@ -131,7 +131,6 @@ src/                the `lust` binary (lust.c + build of LuaJIT)
 examples/           runnable examples, one per library
 tools/              helper used by the meson build
 tools/absl-sources.py  checks the Abseil source list of vendor/meson.build
-tools/bench/        startup / steady state benchmark (`./dev.py bench`)
 tests/              test harness + cross library tests
 vendor/luajit/      LuaJIT (managed by vendor.py, never edit)
 vendor/xxhash/      xxHash (managed by vendor.py, never edit)
@@ -203,29 +202,3 @@ the baselines):
 ```sh
 ./dev.py test --suite bench --test-args=--update
 ```
-
-## Benchmarking
-
-`./dev.py bench` builds everything and compares `lust.xxh` (C API) with
-`lust.xxhffi` (FFI), each as a `.so` in a plain luajit and linked into
-`lust`, pinned (`--cpu N`, default 0; `--libs a,b` to compare other
-libraries with the same API; `--only startup|throughput`):
-
-- **startup**: the interpreter is spawned hundreds of times with
-  `-e 'require "lust.<lib>"'`, interleaved across variants, and the cost
-  of the require is the difference to an empty chunk. User space
-  instruction counts (via `perf`, if usable) are noise free.
-- **steady state**: `tools/bench/throughput.lua` hashes 8 B to 64 KiB inputs;
-  several processes per variant, because JIT trace layout varies by run.
-  A round (one process per variant) runs on one CPU, rounds run in
-  parallel, each on a physical core of its own of the same type as
-  `--cpu` (P/E cores, never SMT siblings). Every variant gets a process
-  per core, so faster cores favour none. `--jobs N` limits the cores,
-  `--jobs 1` runs serially on `--cpu`.
-
-For stable numbers use the `performance` cpufreq governor
-(`sudo cpupower frequency-set -g performance`), disable turbo/boost, close
-other load, or isolate the CPUs (`isolcpus=...` on the kernel command
-line).
-The plain luajit used is the vendored build (`build/vendor/luajit`), so
-that both sides run the same VM binary; `--luajit` selects another one.

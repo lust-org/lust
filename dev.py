@@ -13,7 +13,6 @@ Examples:
   ./dev.py build lust -D libs=crc,xxh # configure which libs get built
   ./dev.py test
   ./dev.py test --suite pcre2 -v      # options go to `meson test`
-  ./dev.py bench                      # C API vs FFI libraries, pinned cpus
   ./dev.py install lust --prefix /usr # needs root, e.g. via sudo/pkexec
   ./dev.py install libs --destdir pkg # staging for distro packaging
 """
@@ -94,13 +93,6 @@ def test(args):
     run("meson", "test", "-C", args.builddir, *args.targets)
 
 
-def bench(args):
-    # Benchmark what is on disk: build everything first.
-    args.targets = ["all"]
-    compile_(args)
-    run(sys.executable, "tools/bench/bench.py", "-B", args.builddir, *args.bench_args)
-
-
 def main():
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("-B", "--builddir", default="build", help="build directory (default: build)")
@@ -125,16 +117,10 @@ def main():
     p = sub.add_parser("test", parents=[common], help="run the tests (extra args go to meson test)")
     p.set_defaults(fn=test)
 
-    p = sub.add_parser("bench", parents=[common], help="benchmark startup and speed (args go to tools/bench/bench.py)")
-    p.set_defaults(fn=bench)
-
-    # `bench` forwards what it doesn't know (e.g. --only startup --cpu 2,
-    # see tools/bench/bench.py -h), `test` to meson test (e.g. --suite crc
+    # `test` forwards what it doesn't know to meson test (e.g. --suite crc
     # -v, test names); for the other commands that is an error.
     args, extra = ap.parse_known_args()
-    if args.cmd == "bench":
-        args.bench_args = extra
-    elif args.cmd == "test":
+    if args.cmd == "test":
         args.targets = extra
     elif extra:
         ap.error(f"unrecognized arguments: {' '.join(extra)}")
