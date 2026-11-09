@@ -23,6 +23,7 @@ print(crc.crc32("123456789")) --> 3421780262
 | `lust.xxh`  | xxHash              | `vendor/xxhash`, linked statically      |
 | `lust.xxhffi` | xxHash, same API  | as above, but bound through the FFI     |
 | `lust.re2`  | RE2 regular expressions | `vendor/re2` + `vendor/abseil`, linked statically (`.so` only, not in `lust`) |
+| `lust.pcre2` | PCRE2 (Perl compatible) regular expressions | `vendor/pcre2`, linked statically |
 
 Libraries come in two kinds (`lib_kind` in their `meson.build`):
 
@@ -61,7 +62,7 @@ git clone <this repo> && cd lust
 (`meson setup build && meson compile -C build && meson test -C build`).
 Meson options (`./dev.py build -D name=value`, see `meson_options.txt`):
 
-- `libs=crc,xxh,xxhffi,re2`: build only these libraries (default: all). This also
+- `libs=crc,xxh,xxhffi,re2,pcre2`: build only these libraries (default: all). This also
   decides which libraries get linked into `lust`.
 - `lust=disabled`: don't build the `lust` binary (skips building LuaJIT).
 - `cmoddir=...`: where the `.so` files go (default `<libdir>/lua/5.1`).
@@ -80,6 +81,7 @@ build/src/lust -e 'print(require("lust.xxh").xxh64("abc"))'
 ```sh
 build/src/lust examples/xxh.lua
 build/src/lust examples/xxhffi.lua
+build/src/lust examples/pcre2.lua
 # crc and re2 are not linked into `lust`, so they are looked up in the
 # build tree:
 LUA_CPATH="$PWD/build/libs/?.so" build/src/lust examples/crc.lua
@@ -130,6 +132,7 @@ vendor/luajit/      LuaJIT (managed by vendor.py, never edit)
 vendor/xxhash/      xxHash (managed by vendor.py, never edit)
 vendor/re2/         RE2 (managed by vendor.py, never edit)
 vendor/abseil/      Abseil, which RE2 needs (managed by vendor.py, never edit)
+vendor/pcre2/       PCRE2 (managed by vendor.py, never edit)
 vendor/meson.build  build definitions of the vendored dependencies
 vendor/vendor.toml  upstream repos + revisions of the above
 ```
@@ -163,9 +166,10 @@ resolved through pkg-config; they stay shared libraries at runtime), or
 3. For a static dependency, add it to `vendor/vendor.toml`, vendor it
    with `vendor.py` and declare a `<dep>_dep` for it in
    `vendor/meson.build` (see `xxhash_dep`). Never add files inside
-   `vendor/<dep>/`. For a dependency that has no meson build (RE2/Abseil)
-   the source lists are kept in `vendor/meson.build`; after upgrading them
-   run `tools/absl-sources.py --check`.
+   `vendor/<dep>/`. For a dependency that has no meson build (RE2/Abseil,
+   PCRE2) the source lists are kept in `vendor/meson.build`; after
+   upgrading RE2/Abseil run `tools/absl-sources.py --check`, after
+   upgrading PCRE2 compare the list with `vendor/pcre2/CMakeLists.txt`.
 
 The `.so`, the static archive for `lust`, install rules and both flavours
 of the tests are derived automatically.

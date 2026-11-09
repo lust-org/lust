@@ -239,3 +239,95 @@ re2_dep = declare_dependency(
   include_directories: re2_inc,
   dependencies: absl_dep,
 )
+
+# ---------------------------------------------------------------------------
+# PCRE2 (8 bit code units only, with Unicode support). Upstream's own build
+# is autotools/CMake, so the source list is kept here (it is the list of
+# PCRE2_HEADERS/SOURCES of vendor/pcre2/CMakeLists.txt; compare it after an
+# upgrade). The configuration is upstream's generic one (config.h.generic,
+# pcre2.h.generic), copied into the build dir, with the features switched
+# on by the compile arguments below. No JIT: its sljit is a git submodule
+# that is not part of the vendored tree.
+# ---------------------------------------------------------------------------
+pcre2_src = 'pcre2' / 'src'
+pcre2_gen = [
+  configure_file(
+    input: pcre2_src / 'config.h.generic',
+    output: 'config.h',
+    copy: true,
+  ),
+  configure_file(
+    input: pcre2_src / 'pcre2.h.generic',
+    output: 'pcre2.h',
+    copy: true,
+  ),
+  # The character tables of the "C" locale, which is what upstream ships
+  # (it is what its own build does unless asked to regenerate them).
+  configure_file(
+    input: pcre2_src / 'pcre2_chartables.c.dist',
+    output: 'pcre2_chartables.c',
+    copy: true,
+  ),
+]
+pcre2_inc = include_directories('.', pcre2_src, is_system: true)
+pcre2_lib = static_library(
+  'pcre2',
+  pcre2_gen[2],
+  files(
+    pcre2_src / 'pcre2_auto_possess.c',
+    pcre2_src / 'pcre2_chkdint.c',
+    pcre2_src / 'pcre2_compile.c',
+    pcre2_src / 'pcre2_compile_cgroup.c',
+    pcre2_src / 'pcre2_compile_class.c',
+    pcre2_src / 'pcre2_config.c',
+    pcre2_src / 'pcre2_context.c',
+    pcre2_src / 'pcre2_convert.c',
+    pcre2_src / 'pcre2_dfa_match.c',
+    pcre2_src / 'pcre2_error.c',
+    pcre2_src / 'pcre2_extuni.c',
+    pcre2_src / 'pcre2_find_bracket.c',
+    pcre2_src / 'pcre2_jit_compile.c',
+    pcre2_src / 'pcre2_maketables.c',
+    pcre2_src / 'pcre2_match.c',
+    pcre2_src / 'pcre2_match_data.c',
+    pcre2_src / 'pcre2_match_next.c',
+    pcre2_src / 'pcre2_newline.c',
+    pcre2_src / 'pcre2_ord2utf.c',
+    pcre2_src / 'pcre2_pattern_info.c',
+    pcre2_src / 'pcre2_script_run.c',
+    pcre2_src / 'pcre2_serialize.c',
+    pcre2_src / 'pcre2_string_utils.c',
+    pcre2_src / 'pcre2_study.c',
+    pcre2_src / 'pcre2_substitute.c',
+    pcre2_src / 'pcre2_substring.c',
+    pcre2_src / 'pcre2_tables.c',
+    pcre2_src / 'pcre2_ucd.c',
+    pcre2_src / 'pcre2_valid_utf.c',
+    pcre2_src / 'pcre2_xclass.c',
+  ),
+  include_directories: pcre2_inc,
+  c_args: [
+    '-DHAVE_CONFIG_H',
+    '-DPCRE2_CODE_UNIT_WIDTH=8',
+    '-DSUPPORT_PCRE2_8=1',
+    '-DSUPPORT_UNICODE=1',
+    # (what upstream's release builds do; meson would keep the asserts)
+    '-DNDEBUG',
+    '-ffile-prefix-map=@0@=.'.format(meson.project_source_root()),
+    '-ffile-prefix-map=@0@=.'.format(meson.project_build_root()),
+  ],
+  override_options: ['warning_level=0'],
+  gnu_symbol_visibility: 'hidden',
+  pic: true,
+  build_by_default: false,
+)
+# Users of the library only see the public header (pcre2.h, in the build
+# dir; they define PCRE2_CODE_UNIT_WIDTH themselves). The archive's symbols
+# must not leak out of the modules (nor out of `lust`, which exports its
+# symbols for the FFI): only `luaopen_lust_*` and what the FFI libraries
+# bind may be exported.
+pcre2_dep = declare_dependency(
+  link_with: pcre2_lib,
+  include_directories: include_directories('.', is_system: true),
+  link_args: ['-Wl,--exclude-libs,libpcre2.a'],
+)
