@@ -1,0 +1,67 @@
+name: Deploy Pages
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: [ 'Sync' ]
+    types:
+      - completed
+    branches: [ main ]
+  push:
+    branches: [ pages ]
+  pull_request:
+    branches: [ pages ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  Build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup
+        run: |
+          echo "set man-db/auto-update false" | sudo debconf-communicate && sudo dpkg-reconfigure man-db
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y hugo
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: pages
+
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Build with Hugo
+        env:
+          HUGO_BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: pages/maint/Build.py
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: ./pages/public
+
+  Deploy:
+    needs: Build
+
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/pages'
+
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write   # to verify the deployment originates from an appropriate source
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
