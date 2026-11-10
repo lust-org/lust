@@ -2,14 +2,14 @@
 # tests/test_bench.py (see there). Regenerate after an intended change:
 #   ./dev.py test --suite bench --test-args=--update
 # <flavour> <benchmark> <instructions>
-luajit create.lua 2427985
+luajit create.lua 2376545
 luajit list.lua 20087407
 luajit stat.lua 50596368
 luajit stat_into.lua 21182228
 luajit walkdir.lua 11245633
 luajit walkdir_depth.lua 8993590
 luajit walkdir_prune.lua 9800029
-lust create.lua 2352732
+lust create.lua 2309497
 lust list.lua 19716265
 lust stat.lua 51008474
 lust stat_into.lua 20919894

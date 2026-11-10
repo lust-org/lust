@@ -461,74 +461,68 @@ typedef struct {
   const char *dir, *prefix, *suffix;
   int allow_suffix; /* (mkdtemp has no suffix) */
   size_t xs;        /* offset of the XXXXXX in the template */
+  size_t sl;        /* length of the suffix */
 } TempOpts;
-
-/* Stack slots of tempfile/tempdir for the strings of the options: the
- * pointers must not depend on the opts table, which a finalizer run by
- * an allocation may change (docs/gc-reentrancy.md). */
-enum { TEMP_SLOT_DIR = 2, TEMP_SLOT_PREFIX, TEMP_SLOT_SUFFIX };
 
 static void temp_opt(lua_State *L, int arg, const char *key, void *ud) {
   TempOpts *o = (TempOpts *)ud;
-  int slot;
   if (strcmp(key, "dir") == 0) {
     o->dir = str_opt(L, arg, key);
-    slot = TEMP_SLOT_DIR;
   } else if (strcmp(key, "prefix") == 0 || (o->allow_suffix && strcmp(key, "suffix") == 0)) {
     const char *s = str_opt(L, arg, key);
     /* (the name would end up in another directory) */
     if (strchr(s, '/') != NULL)
       luaL_argerror(L, arg, lua_pushfstring(L, "%s must not contain '/'", key));
-    if (key[0] == 'p') {
-      o->prefix = s;
-      slot = TEMP_SLOT_PREFIX;
-    } else {
-      o->suffix = s;
-      slot = TEMP_SLOT_SUFFIX;
-    }
+    if (key[0] == 'p') o->prefix = s;
+    else o->suffix = s;
   } else {
     bad_opt(L, arg, key);
-    return;
   }
-  lua_pushvalue(L, -1);
-  lua_replace(L, slot);
+}
+
+/* Appends n bytes of s to the template t of PATH_MAX bytes at offset at,
+ * as far as they fit; returns the offset behind them (PATH_MAX if they
+ * didn't fit). */
+static size_t temp_put(char *t, size_t at, const char *s, size_t n) {
+  if (n > PATH_MAX - at) n = PATH_MAX - at;
+  memcpy(t + at, s, n);
+  return at + n;
 }
 
 /*
- * Parses the options at argument 1 and pushes the template
- * "<dir>/<prefix>XXXXXX<suffix>" as a mutable buffer owned by the GC.
- * dir defaults to $TMPDIR, or /tmp if that is unset or empty.
+ * Parses the options at argument 1 and builds the template
+ * "<dir>/<prefix>XXXXXX<suffix>" in t. dir defaults to $TMPDIR, or /tmp
+ * if that is unset or empty. Returns 0 if it is longer than a path may be
+ * (t then holds its beginning, ending in "...").
+ *
+ * The option strings are only anchored by the opts table, which a
+ * finalizer may change: they are copied to t with no GC step between
+ * parsing and copying, hence t on the C stack rather than allocated
+ * (docs/gc-reentrancy.md).
  */
-static char *push_template(lua_State *L, TempOpts *o) {
-  size_t dl, pl, sl;
-  int slash;
-  char *t, *w;
+static int temp_template(lua_State *L, TempOpts *o, char t[PATH_MAX]) {
+  size_t dl, at;
 
   o->dir = o->suffix = NULL;
   o->prefix = DEFAULT_PREFIX;
-  lua_settop(L, TEMP_SLOT_SUFFIX); /* (the slots, nil) */
   parse_opts(L, 1, temp_opt, o);
   if (o->dir == NULL) {
     o->dir = getenv("TMPDIR");
     if (o->dir == NULL || o->dir[0] == '\0') o->dir = "/tmp";
   }
   if (o->suffix == NULL) o->suffix = "";
+  o->sl = strlen(o->suffix);
 
   dl = strlen(o->dir);
-  pl = strlen(o->prefix);
-  sl = strlen(o->suffix);
-  slash = dl > 0 && o->dir[dl - 1] != '/';
-  t = w = (char *)lua_newuserdata(L, dl + (size_t)slash + pl + 6 + sl + 1);
-  memcpy(w, o->dir, dl);
-  w += dl;
-  if (slash) *w++ = '/';
-  memcpy(w, o->prefix, pl);
-  w += pl;
-  o->xs = (size_t)(w - t);
-  memcpy(w, "XXXXXX", 6);
-  w += 6;
-  memcpy(w, o->suffix, sl + 1);
-  return t;
+  at = temp_put(t, 0, o->dir, dl);
+  if (dl > 0 && o->dir[dl - 1] != '/') at = temp_put(t, at, "/", 1);
+  at = temp_put(t, at, o->prefix, strlen(o->prefix));
+  o->xs = at;
+  at = temp_put(t, at, "XXXXXX", 6);
+  at = temp_put(t, at, o->suffix, o->sl + 1); /* (with the NUL) */
+  if (at < PATH_MAX || t[PATH_MAX - 1] == '\0') return 1;
+  memcpy(t + PATH_MAX - 4, "...", 4);
+  return 0;
 }
 
 /* The error of a failed mkostemps/mkdtemp, which may have changed the
@@ -541,14 +535,14 @@ static int temp_error(lua_State *L, char *t, const TempOpts *o, int e) {
 /* fs.tempfile([opts]) -> path | nil, err, code */
 static int l_tempfile(lua_State *L) {
   TempOpts o;
-  char *t;
+  char t[PATH_MAX];
   int fd;
 
   o.allow_suffix = 1;
-  t = push_template(L, &o);
+  if (!temp_template(L, &o, t)) return lust_push_errno(L, t, ENAMETOOLONG);
   /* Creates the file with O_EXCL and mode 0600; the name is kept, the
    * descriptor not (a C module cannot hand it to Lua as a file) */
-  fd = mkostemps(t, (int)strlen(o.suffix), O_CLOEXEC);
+  fd = mkostemps(t, (int)o.sl, O_CLOEXEC);
   if (fd < 0) return temp_error(L, t, &o, errno);
   close(fd);
   lua_pushstring(L, t);
@@ -558,10 +552,10 @@ static int l_tempfile(lua_State *L) {
 /* fs.tempdir([opts]) -> path | nil, err, code */
 static int l_tempdir(lua_State *L) {
   TempOpts o;
-  char *t;
+  char t[PATH_MAX];
 
   o.allow_suffix = 0;
-  t = push_template(L, &o);
+  if (!temp_template(L, &o, t)) return lust_push_errno(L, t, ENAMETOOLONG);
   if (mkdtemp(t) == NULL) return temp_error(L, t, &o, errno); /* (mode 0700) */
   lua_pushstring(L, t);
   return 1;

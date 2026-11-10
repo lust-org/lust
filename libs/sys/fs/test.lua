@@ -324,6 +324,27 @@ T.run {
     fails("ENOENT", dir .. "/nope/lust-XXXXXX: no such file or directory",
       fs.tempfile { dir = dir .. "/nope" })
     fails("ENOENT", "no such file or directory", fs.tempdir { dir = dir .. "/nope" })
+    -- Longer than a path may be (PATH_MAX, 4096 with the NUL): the
+    -- message has the beginning of the template.
+    local long = dir .. "/" .. ("x"):rep(5000)
+    for _, f in ipairs { fs.tempfile, fs.tempdir } do
+      local v, err, code = f { dir = long }
+      fails("ENAMETOOLONG", "...: file name too long", v, err, code)
+      T.eq(#err, 4095 + #": file name too long", "message length")
+      T.eq(err:sub(1, #dir + 2), dir .. "/x")
+    end
+    -- A template of 4095 bytes still fits, one of 4096 doesn't (the
+    -- kernel's limit, too). The directory of n bytes (with "/lust-XXXXXX"
+    -- appended) is missing, its parts within NAME_MAX.
+    local dir_of = function(n)
+      local d = dir
+      while n - 12 - #d > 202 do d = d .. "/" .. ("y"):rep(200) end
+      d = d .. "/" .. ("y"):rep(n - 12 - #d - 1) -- (1 to 201, no trailing /)
+      T.eq(#d, n - 12)
+      return d
+    end
+    fails("ENOENT", "/lust-XXXXXX: no such", fs.tempfile { dir = dir_of(4095) })
+    fails("ENAMETOOLONG", "...: file name too long", fs.tempfile { dir = dir_of(4096) })
   end),
 
   argument_errors = function()
