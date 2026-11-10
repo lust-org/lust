@@ -1,0 +1,10 @@
+Changes the environment of the process: what os.getenv reads and child
+processes inherit. A name is non-empty, without "=". libc keeps every
+value ever set (for pointers getenv returned): don't set ever new values
+in a loop
+
+set(name, value)
+  Sets environment variable name to value
+
+unset(name)
+  Removes environment variable name (no error if it isn't set)

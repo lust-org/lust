@@ -47,6 +47,7 @@ all_libs = [
   'fs',
   'sys.time',
   'sys.random',
+  'sys.env',
 ]
 
 requested = get_option('libs')
