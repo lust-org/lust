@@ -8,16 +8,15 @@
  *
  * Both take a file descriptor: 0, 1, 2 for stdin, stdout, stderr.
  */
-#define _GNU_SOURCE /* strerrorname_np */
+#define _GNU_SOURCE /* strerrorname_np (lust_errno.h) */
 
-#include <ctype.h>
 #include <errno.h>
 #include <limits.h>
-#include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
 #include "lust.h"
+#include "lust_errno.h"
 
 /* A file descriptor argument: an integer >= 0. */
 static int check_fd(lua_State *L, int arg) {
@@ -25,20 +24,6 @@ static int check_fd(lua_State *L, int arg) {
   if (!(n >= 0 && n <= INT_MAX && n == (lua_Number)(int)n))
     luaL_argerror(L, arg, "must be a file descriptor (an integer >= 0)");
   return (int)n;
-}
-
-/* Returns nil, "fd <fd>: <strerror(e)>", "<errno name>" (the message
- * starts lowercase like all lust error messages). */
-static int push_errno(lua_State *L, int fd, int e) {
-  const char *msg = strerror(e);
-  const char *name = strerrorname_np(e);
-  int c = (unsigned char)msg[0];
-  if (isupper(c) && !isupper((unsigned char)msg[1])) c = tolower(c);
-  lua_pushnil(L);
-  lua_pushfstring(L, "fd %d: %c%s", fd, c, msg[0] ? msg + 1 : "");
-  if (name != NULL) lua_pushstring(L, name);
-  else lua_pushfstring(L, "E%d", e); /* (not known to this libc) */
-  return 3;
 }
 
 static int l_isatty(lua_State *L) {
@@ -51,7 +36,12 @@ static int l_isatty(lua_State *L) {
 static int l_size(lua_State *L) {
   int fd = check_fd(L, 1);
   struct winsize ws;
-  if (ioctl(fd, TIOCGWINSZ, &ws) != 0) return push_errno(L, fd, errno);
+  if (ioctl(fd, TIOCGWINSZ, &ws) != 0) {
+    int e = errno, c;
+    const char *rest = lust_strerror(e, &c);
+    lua_pushfstring(L, "fd %d: %c%s", fd, c, rest);
+    return lust_errno_result(L, e);
+  }
   lua_pushinteger(L, ws.ws_col);
   lua_pushinteger(L, ws.ws_row);
   return 2;

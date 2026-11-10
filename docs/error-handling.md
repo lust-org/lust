@@ -35,6 +35,8 @@
 - On `nil, err`, reset the stack (`lua_settop`); no partial results.
 - `ffi` C functions never raise: they return a status, the Lua part
   applies the rules above.
+- A failed system call returns `nil, "<what>: <reason>", "<errno name>"`
+  built by `lust_push_errno` (`include/lust_errno.h`).
 
 ## Tests
 

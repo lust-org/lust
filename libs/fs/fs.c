@@ -30,7 +30,6 @@
 /* strerrorname_np, mkostemps, st_mtim, d_type ... are not plain C11 */
 #define _GNU_SOURCE
 
-#include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -42,6 +41,7 @@
 #include <unistd.h>
 
 #include "lust.h"
+#include "lust_errno.h"
 
 #ifndef LUST_LUA_BC_H
 #error "LUST_LUA_BC_H must be defined (by libs/lust/meson.build)"
@@ -98,25 +98,6 @@ typedef struct {
 /* ------------------------------------------------------------------ */
 /* helpers                                                             */
 /* ------------------------------------------------------------------ */
-
-/*
- * Returns nil, "<path>: <strerror(e)>", "<errno name>". The message starts
- * lowercase like all lust error messages (unless it starts with an
- * acronym). What else is on the stack is not returned.
- */
-static int push_errno(lua_State *L, const char *path, int e) {
-  const char *msg = strerror(e);
-  const char *name = strerrorname_np(e);
-  int c = (unsigned char)msg[0];
-  if (isupper(c) && !isupper((unsigned char)msg[1])) c = tolower(c);
-  /* (the message first: `path` may live on the stack) */
-  lua_pushfstring(L, "%s: %c%s", path, c, msg[0] ? msg + 1 : "");
-  if (name != NULL) lua_pushstring(L, name);
-  else lua_pushfstring(L, "E%d", e); /* (not known to this libc) */
-  lua_pushnil(L);
-  lua_insert(L, -3);
-  return 3;
-}
 
 /* A path argument: a string without zero bytes (the kernel would silently
  * truncate it there). */
@@ -264,7 +245,7 @@ static int l_list(lua_State *L) {
   if (st->buf == NULL && (st->buf = (char *)malloc(DIRBUF_SIZE)) == NULL)
     return luaL_error(L, "not enough memory");
   st->fd = open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
-  if (st->fd < 0) return push_errno(L, path, errno);
+  if (st->fd < 0) return lust_push_errno(L, path, errno);
   st->busy = 1;
 
   for (;;) {
@@ -300,7 +281,7 @@ static int l_list(lua_State *L) {
   }
   state_close(st);
   st->busy = 0;
-  if (e != 0) return push_errno(L, path, e);
+  if (e != 0) return lust_push_errno(L, path, e);
   if (names_idx == 0) { /* (no entries at all: a removed directory) */
     lua_newtable(L);
     if (types) lua_newtable(L);
@@ -346,7 +327,7 @@ static int l_stat(lua_State *L) {
   if (fill) luaL_checktype(L, 3, LUA_TTABLE);
   parse_opts(L, 2, stat_opt, &follow);
   if ((follow ? stat(path, &sb) : lstat(path, &sb)) != 0)
-    return push_errno(L, path, errno);
+    return lust_push_errno(L, path, errno);
 
   if (fill) lua_settop(L, 3); /* (t on top) */
   else lua_createtable(L, 0, K_N);
@@ -386,7 +367,7 @@ static int l_readlink(lua_State *L) {
     lua_settop(L, 1);
     buf = (char *)lua_newuserdata(L, cap);
   }
-  if (n < 0) return push_errno(L, path, errno);
+  if (n < 0) return lust_push_errno(L, path, errno);
   lua_pushlstring(L, buf, (size_t)n);
   return 1;
 }
@@ -455,11 +436,11 @@ static int l_mkdir(lua_State *L) {
   /* The common cases cost one syscall: the parent exists ... */
   if (mkdir(path, o.mode) == 0) goto ok;
   e = errno;
-  if (!o.parents) return push_errno(L, path, e);
+  if (!o.parents) return lust_push_errno(L, path, e);
   /* ... or the directory does (else ENOENT: a parent is missing) */
   if (e != ENOENT) {
     if (is_dir(path)) goto ok;
-    return push_errno(L, path, e);
+    return lust_push_errno(L, path, e);
   }
 
   /* A copy to cut into prefixes, owned by the GC (we may raise) */
@@ -467,7 +448,7 @@ static int l_mkdir(lua_State *L) {
   buf = (char *)lua_newuserdata(L, len + 1);
   memcpy(buf, path, len + 1);
   e = mkdir_parents(buf, o.mode);
-  if (e != 0) return push_errno(L, buf, e);
+  if (e != 0) return lust_push_errno(L, buf, e);
 ok:
   lua_pushboolean(L, 1);
   return 1;
@@ -539,7 +520,7 @@ static char *push_template(lua_State *L, TempOpts *o) {
  * XXXXXX of the template already. */
 static int temp_error(lua_State *L, char *t, const TempOpts *o, int e) {
   memcpy(t + o->xs, "XXXXXX", 6);
-  return push_errno(L, t, e);
+  return lust_push_errno(L, t, e);
 }
 
 /* fs.tempfile([opts]) -> path | nil, err, code */

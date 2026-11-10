@@ -25,7 +25,6 @@
  */
 #define _GNU_SOURCE /* pipe2, strerrorname_np, sigabbrev_np, posix_spawn_file_actions_*_np */
 
-#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -39,6 +38,7 @@
 #include <unistd.h>
 
 #include "lust.h"
+#include "lust_errno.h"
 
 extern char **environ;
 
@@ -104,24 +104,6 @@ static void run_cleanup(Run *r) {
 static int l_run_gc(lua_State *L) {
   run_cleanup(lua_touserdata(L, 1));
   return 0;
-}
-
-/*
- * Returns nil, "<what>: <strerror(e)>", "<errno name>" (lowercase start
- * like all lust error messages). `what` may live on the stack: it is
- * used before the stack is changed.
- */
-static int push_errno(lua_State *L, const char *what, int e) {
-  const char *msg = strerror(e);
-  const char *name = strerrorname_np(e);
-  int c = (unsigned char)msg[0];
-  if (isupper(c) && !isupper((unsigned char)msg[1])) c = tolower(c);
-  lua_pushfstring(L, "%s: %c%s", what, c, msg[0] ? msg + 1 : "");
-  if (name != NULL) lua_pushstring(L, name);
-  else lua_pushfstring(L, "E%d", e); /* (not known to this libc) */
-  lua_pushnil(L);
-  lua_insert(L, -3);
-  return 3;
 }
 
 /* A string without zero bytes (the kernel would cut it short there). */
@@ -420,10 +402,12 @@ static int l_run(lua_State *L) {
   if ((e = start(r, argv, envp, &o)) != 0) {
     run_cleanup(r);
     if (o.cwd) {
-      lua_pushfstring(L, "%s (in %s)", argv[0], o.cwd);
-      return push_errno(L, lua_tostring(L, -1), e);
+      int c;
+      const char *rest = lust_strerror(e, &c);
+      lua_pushfstring(L, "%s (in %s): %c%s", argv[0], o.cwd, c, rest);
+      return lust_errno_result(L, e);
     }
-    return push_errno(L, argv[0], e);
+    return lust_push_errno(L, argv[0], e);
   }
   if (io_loop(r, &o) != 0) {
     run_cleanup(r);
@@ -434,7 +418,7 @@ static int l_run(lua_State *L) {
      * unless SIGCHLD is ignored) */
     if (errno != EINTR) {
       r->pid = 0;
-      return push_errno(L, argv[0], errno);
+      return lust_push_errno(L, argv[0], errno);
     }
   }
   r->pid = 0;
