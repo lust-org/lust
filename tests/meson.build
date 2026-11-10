@@ -99,7 +99,7 @@ if lust_feature.allowed()
   test(
     'usage text',
     py,
-    args: [files('test_usage.py'), lust_exe] + doc_args,
+    args: [files('test_usage.py'), lust_exe, luajit_exe] + doc_args,
     suite: ['doc'],
   )
 endif

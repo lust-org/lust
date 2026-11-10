@@ -35,17 +35,17 @@
 #define LUAJIT_VERSION "LuSt " LUST_VERSION " -- " LUST_URL "\n\0"
 
 /* The usage text. luajit.c prints it (to stderr) when it is given invalid
- * options (`-h` among them), from its static print_usage(), which cannot
- * be replaced from the outside. It is also not possible to simply wrap it,
- * as the definition and the one call share a name. They only differ in
- * their argument list though, which this function-like macro tells apart:
+ * options, from its static print_usage(), which cannot be replaced from the
+ * outside. The definition and the one call share a name, but differ in
+ * their argument list, which this function-like macro tells apart:
  *   definition  static void print_usage(void)  ->  luajit_print_usage ()
  *   call        print_usage();                 ->  lust_print_usage ();
- * So the original keeps printing the options, and lust_print_usage()
- * (below) adds to it: a pointer to `--help` or, for `--help` itself, the
- * documentation of the libraries. If a future LuaJIT changes the shape of
- * either, the build breaks or the test of the usage text fails
- * (tests/test_usage.py). */
+ * So the call goes to lust_print_usage() (below), which prints lust's own
+ * option list (with `-h|--help`) and, for `--help`, the documentation of
+ * the libraries. The original stays defined but unused. If a future LuaJIT
+ * changes the shape of either, or its option list, the build breaks or the
+ * test of the usage text fails (tests/test_usage.py compares the options
+ * against the vendored luajit). */
 #include <stdio.h>
 #include <string.h>
 
@@ -54,7 +54,7 @@
 static int lust_full_help; /* `lust --help`: also document the libraries */
 
 static void lust_print_usage(void);
-#define LUST_USAGE_void luajit_print_usage
+#define LUST_USAGE_void __attribute__((unused)) luajit_print_usage
 #define LUST_USAGE_ lust_print_usage
 #define print_usage(arg) LUST_USAGE_##arg()
 
@@ -84,23 +84,40 @@ static void lust_print_usage(void);
 #include "luajit.c"
 #undef main
 
-/* The options of luajit.c, then either a pointer to `--help` or the
- * libraries: the doc-shortform.txt of each of them, collected at build time
- * by tools/gen-help.py. */
+/* The options of luajit.c (in the same words, plus `-h|--help`), then for
+ * `--help` the libraries: the doc-shortform.txt of each of them, collected
+ * at build time by tools/gen-help.py. `progname` is luajit.c's (argv[0]). */
 static void lust_print_usage(void) {
-  luajit_print_usage();
+  fputs("usage: ", stderr);
+  fputs(progname, stderr);
+  fputs(" [options]... [script [args]...].\n"
+        "\n"
+        "OPTIONS\n"
+        "  -e chunk  Execute string 'chunk'.\n"
+        "  -l name   Require library 'name'.\n"
+        "  -b ...    Save or list bytecode.\n"
+        "  -j cmd    Perform LuaJIT control command.\n"
+        "  -O[opt]   Control LuaJIT optimizations.\n"
+        "  -i        Enter interactive mode after executing 'script'.\n"
+        "  -v        Show version information.\n"
+        "  -E        Ignore environment variables.\n"
+        "  -h|--help Show this help text\n"
+        "  --        Stop handling options.\n"
+        "  -         Execute stdin and stop handling options.\n",
+        stderr);
   if (lust_full_help)
     fputs("\nLIBRARIES\n" LUST_HELP_LIBRARIES, stderr);
-  else
-    fputs("\nRun with --help to list the libraries and their API.\n", stderr);
   fflush(stderr);
 }
 
-/* `--help` as the first argument is recognized here (to luajit.c it is just
- * another invalid option, which prints the usage); asking for help is not
- * an error, so it exits successfully. */
+/* `-h` and `--help` as the first argument are recognized here (to luajit.c
+ * they are just invalid options, which print the usage); asking for help is
+ * not an error, so they exit successfully. Only `--help` adds the
+ * libraries. */
 int main(int argc, char **argv) {
-  lust_full_help = argc > 1 && strcmp(argv[1], "--help") == 0;
+  int help = argc > 1 && (strcmp(argv[1], "-h") == 0 ||
+                          strcmp(argv[1], "--help") == 0);
+  lust_full_help = help && strcmp(argv[1], "--help") == 0;
   int status = luajit_main(argc, argv);
-  return lust_full_help ? 0 : status;
+  return help ? 0 : status;
 }

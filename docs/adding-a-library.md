@@ -11,7 +11,7 @@
    - `test.lua` (see `libs/xxh/test.lua`),
    - `doc-shortform.txt`: the API as succinct as possible (format: see
      `tools/gen-help.py`, example: `libs/xxh/doc-shortform.txt`). It is
-     part of the usage text of `lust` (`lust --help`, section `LIBRARIES`; plain `-h` only points to it), and
+     part of the usage text of `lust` (`lust --help`, section `LIBRARIES`; plain `-h` lists only the options), and
      `tests/test_doc.lua` checks that it lists exactly what the module
      exports. The build fails without it,
    - `bench/*.lua`: benchmarks of what the library provides, and their
