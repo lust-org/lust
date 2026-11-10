@@ -48,6 +48,7 @@ all_libs = [
   'sys.time',
   'sys.random',
   'sys.env',
+  'sys.term',
 ]
 
 requested = get_option('libs')
