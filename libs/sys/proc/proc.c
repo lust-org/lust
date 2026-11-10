@@ -69,7 +69,7 @@ typedef struct {
 } Run;
 
 typedef struct {
-  const char *cwd;  /* NULL: ours */
+  const char *cwd;  /* NULL: ours (the strings are in stack slots) */
   int env;          /* stack index of opts.env, 0: none */
   const char *input;
   size_t input_len;
@@ -119,69 +119,98 @@ static int is_c_string(lua_State *L, int idx) {
 /* arguments                                                           */
 /* ------------------------------------------------------------------ */
 
-/* argv as a NULL terminated array (in a userdata; the strings stay
- * referenced by the table). */
-static char **check_argv(lua_State *L, int arg) {
-  size_t n;
-  char **argv;
-  luaL_checktype(L, arg, LUA_TTABLE);
-  n = lua_objlen(L, arg);
-  if (n == 0) luaL_argerror(L, arg, "argv is empty");
-  argv = lua_newuserdata(L, (n + 1) * sizeof *argv);
-  for (size_t i = 0; i < n; i++) {
-    lua_rawgeti(L, arg, (int)i + 1);
+/*
+ * Stack slots of run: the arguments, then the values of opts.cwd, input
+ * and env (nil if not set), so that the pointers to them stay valid: a
+ * finalizer run by an allocation may change opts, nothing changes our
+ * stack (docs/gc-reentrancy.md).
+ */
+enum { ARGV = 1, OPTS, SLOT_CWD, SLOT_INPUT, SLOT_ENV, NSLOTS = SLOT_ENV };
+
+/*
+ * Fills argv (n + 1 entries) with the strings of the table at index ARGV,
+ * NULL terminated, or raises if one isn't a string without zero bytes.
+ * The pointers are valid only while the table holds the strings: nothing
+ * between this and the spawn may run a GC step. Leaves argv[1] on the
+ * stack (the program, anchored for error messages after the spawn).
+ */
+static void fill_argv(lua_State *L, char **argv, size_t n) {
+  for (size_t i = n; i > 0; i--) { /* (backwards: argv[1] stays on top) */
+    if (i < n) lua_pop(L, 1);
+    lua_rawgeti(L, ARGV, (int)i);
     if (!is_c_string(L, -1))
-      luaL_argerror(L, arg, lua_pushfstring(L, "argv[%d] must be a string without zero bytes", (int)i + 1));
-    argv[i] = (char *)lua_tostring(L, -1);
-    lua_pop(L, 1);
+      luaL_argerror(L, ARGV, lua_pushfstring(L, "argv[%d] must be a string without zero bytes", (int)i));
+    argv[i - 1] = (char *)lua_tostring(L, -1);
   }
   argv[n] = NULL;
-  return argv;
 }
 
-static int bad_opt(lua_State *L, int arg, const char *msg, const char *key) {
-  return luaL_argerror(L, arg, lua_pushfstring(L, msg, key));
+static int bad_opt(lua_State *L, const char *msg, const char *key) {
+  return luaL_argerror(L, OPTS, lua_pushfstring(L, msg, key));
 }
 
-static int check_out(lua_State *L, int arg, const char *key) {
+static int check_out(lua_State *L, const char *key) {
   const char *s = lua_type(L, -1) == LUA_TSTRING ? lua_tostring(L, -1) : "";
   if (strcmp(s, "capture") == 0) return OUT_CAPTURE;
   if (strcmp(s, "inherit") == 0) return OUT_INHERIT;
   if (strcmp(s, "null") == 0) return OUT_NULL;
-  return bad_opt(L, arg, "%s must be 'capture', 'inherit' or 'null'", key);
+  return bad_opt(L, "%s must be 'capture', 'inherit' or 'null'", key);
 }
 
-static void check_opts(lua_State *L, int arg, Opts *o) {
+/* Checks the options at index OPTS into o; the values of cwd, input and
+ * env go to their stack slots, too. */
+static void check_opts(lua_State *L, Opts *o) {
   memset(o, 0, sizeof *o);
-  if (lua_isnoneornil(L, arg)) return;
-  luaL_checktype(L, arg, LUA_TTABLE);
+  if (lua_isnoneornil(L, OPTS)) return;
+  luaL_checktype(L, OPTS, LUA_TTABLE);
   lua_pushnil(L);
-  while (lua_next(L, arg)) {
+  while (lua_next(L, OPTS)) {
     const char *k = lua_type(L, -2) == LUA_TSTRING ? lua_tostring(L, -2) : "?";
+    int slot = 0;
     if (strcmp(k, "cwd") == 0) {
-      if (!is_c_string(L, -1)) bad_opt(L, arg, "%s must be a string without zero bytes", k);
-      o->cwd = lua_tostring(L, -1);
+      if (!is_c_string(L, -1)) bad_opt(L, "%s must be a string without zero bytes", k);
+      slot = SLOT_CWD;
     } else if (strcmp(k, "env") == 0) {
-      if (!lua_istable(L, -1)) bad_opt(L, arg, "%s must be a table", k);
-      o->env = 1; /* (the index is taken below, from opts itself) */
+      if (!lua_istable(L, -1)) bad_opt(L, "%s must be a table", k);
+      slot = SLOT_ENV;
     } else if (strcmp(k, "input") == 0) {
-      if (lua_type(L, -1) != LUA_TSTRING) bad_opt(L, arg, "%s must be a string", k);
-      o->input = lua_tolstring(L, -1, &o->input_len);
-      o->has_input = 1;
+      if (lua_type(L, -1) != LUA_TSTRING) bad_opt(L, "%s must be a string", k);
+      slot = SLOT_INPUT;
     } else if (strcmp(k, "stdout") == 0) {
-      o->out[OUT] = check_out(L, arg, k);
+      o->out[OUT] = check_out(L, k);
     } else if (strcmp(k, "stderr") == 0) {
-      o->out[ERR] = check_out(L, arg, k);
+      o->out[ERR] = check_out(L, k);
     } else {
-      bad_opt(L, arg, "unknown option '%s'", k);
+      bad_opt(L, "unknown option '%s'", k);
+    }
+    if (slot != 0) {
+      lua_pushvalue(L, -1);
+      lua_replace(L, slot);
     }
     lua_pop(L, 1);
   }
-  /* (cwd and input stay referenced by opts) */
-  if (o->env) {
-    lua_getfield(L, arg, "env");
-    o->env = lua_gettop(L);
+  if (!lua_isnil(L, SLOT_CWD)) o->cwd = lua_tostring(L, SLOT_CWD);
+  if (!lua_isnil(L, SLOT_INPUT)) {
+    o->input = lua_tolstring(L, SLOT_INPUT, &o->input_len);
+    o->has_input = 1;
   }
+  if (!lua_isnil(L, SLOT_ENV)) o->env = SLOT_ENV;
+}
+
+/* Does the table at index env name the variable var ("name=value")?
+ * (Runs no GC step, see build_env.) */
+static int named_in(lua_State *L, int env, const char *var, size_t namelen) {
+  lua_pushnil(L);
+  while (lua_next(L, env)) {
+    size_t kl;
+    const char *k = lua_tolstring(L, -2, &kl); /* (checked: a string) */
+    lua_pop(L, 1);
+    if (kl == namelen && memcmp(k, var, namelen) == 0) {
+      lua_pop(L, 1);
+      return 1;
+    }
+  }
+  return 0;
 }
 
 /*
@@ -190,42 +219,51 @@ static void check_opts(lua_State *L, int arg, Opts *o) {
  * terminated array in a userdata; the "name=value" strings it adds are
  * kept in a table, both left on the stack.
  */
-static char **build_env(lua_State *L, int arg, int env) {
-  size_t n = 0, i = 0;
-  char **envp;
+static char **build_env(lua_State *L, int env) {
+  size_t n_set = 0, i = 0;
+  char **envp, **e;
   int strs;
-  for (char **e = environ; *e; e++) n++;
-  /* (an upper bound: ours plus all of opts.env) */
   lua_pushnil(L);
   while (lua_next(L, env)) {
     if (!is_c_string(L, -2) || lua_objlen(L, -2) == 0 || strchr(lua_tostring(L, -2), '='))
-      luaL_argerror(L, arg, "env names must be non-empty strings without '=' and zero bytes");
+      luaL_argerror(L, OPTS, "env names must be non-empty strings without '=' and zero bytes");
     if (!is_c_string(L, -1) && !(lua_type(L, -1) == LUA_TBOOLEAN && !lua_toboolean(L, -1)))
-      luaL_argerror(L, arg, lua_pushfstring(L, "env.%s must be a string without zero bytes or false",
-                                            lua_tostring(L, -2)));
+      luaL_argerror(L, OPTS, lua_pushfstring(L, "env.%s must be a string without zero bytes or false",
+                                             lua_tostring(L, -2)));
     lua_pop(L, 1);
-    n++;
   }
-  envp = lua_newuserdata(L, (n + 1) * sizeof *envp);
+  /* the "name=value" strings of the ones set */
   lua_newtable(L);
   strs = lua_gettop(L);
-  /* ours, unless replaced */
-  for (char **e = environ; *e; e++) {
-    const char *eq = strchr(*e, '=');
-    if (eq == NULL) continue; /* (malformed: nothing to pass on) */
-    lua_pushlstring(L, *e, (size_t)(eq - *e));
-    lua_rawget(L, env);
-    if (lua_isnil(L, -1)) envp[i++] = *e;
-    lua_pop(L, 1);
-  }
-  /* the ones set */
   lua_pushnil(L);
   while (lua_next(L, env)) {
     if (lua_type(L, -1) == LUA_TSTRING) {
       lua_pushfstring(L, "%s=%s", lua_tostring(L, -2), lua_tostring(L, -1));
-      envp[i++] = (char *)lua_tostring(L, -1);
-      lua_rawseti(L, strs, (int)i);
+      lua_rawseti(L, strs, (int)++n_set);
     }
+    lua_pop(L, 1);
+  }
+  /* Room for ours and those: environ is counted again after allocating
+   * it, since a finalizer run by that may have added variables (setenv). */
+  for (;;) {
+    size_t n = 0, now = 0;
+    for (e = environ; *e; e++) n++;
+    envp = lua_newuserdata(L, (n + n_set + 1) * sizeof *envp);
+    for (e = environ; *e; e++) now++;
+    if (now <= n) break;
+    lua_pop(L, 1);
+  }
+  /* From here on, nothing runs a GC step (a finalizer could change
+   * environ while we copy it). Ours, unless replaced: */
+  for (e = environ; *e; e++) {
+    const char *eq = strchr(*e, '=');
+    if (eq == NULL) continue; /* (malformed: nothing to pass on) */
+    if (!named_in(L, env, *e, (size_t)(eq - *e))) envp[i++] = *e;
+  }
+  /* the ones set (anchored by strs) */
+  for (size_t k = 1; k <= n_set; k++) {
+    lua_rawgeti(L, strs, (int)k);
+    envp[i++] = (char *)lua_tostring(L, -1);
     lua_pop(L, 1);
   }
   envp[i] = NULL;
@@ -388,16 +426,24 @@ static int l_run(lua_State *L) {
   char **argv, **envp = NULL;
   Run *r;
   int e, ws;
-  lua_settop(L, 2); /* (so what is pushed below isn't taken for opts) */
-  argv = check_argv(L, 1);
-  check_opts(L, 2, &o);
-  if (o.env) envp = build_env(L, 2, o.env);
+  size_t n;
+  lua_settop(L, NSLOTS); /* (the arguments, then the slots, all nil) */
+  luaL_checktype(L, ARGV, LUA_TTABLE);
+  n = lua_objlen(L, ARGV);
+  if (n == 0) luaL_argerror(L, ARGV, "argv is empty");
+  check_opts(L, &o);
 
+  /* Everything that allocates first ... */
+  argv = lua_newuserdata(L, (n + 1) * sizeof *argv);
+  if (o.env) envp = build_env(L, o.env);
   r = lua_newuserdata(L, sizeof *r);
   memset(r, 0, sizeof *r);
   for (int i = 0; i < NFD; i++) r->fd[i] = r->child[i] = -1;
   lua_pushvalue(L, RUN_MT_UV);
   lua_setmetatable(L, -2);
+  /* ... then argv, whose strings only the table holds: nothing may run a
+   * GC step (and a finalizer change the table) until the spawn */
+  fill_argv(L, argv, n);
 
   if ((e = start(r, argv, envp, &o)) != 0) {
     run_cleanup(r);

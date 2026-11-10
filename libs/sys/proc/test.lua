@@ -133,4 +133,30 @@ T.run {
     T.raises(function() proc.run({ "true" }, { env = { A = 1 } }) end, "env.A must be a string")
     T.raises(function() proc.run({ "true" }, { env = { A = true } }) end, "env.A must be a string")
   end,
+
+  -- A finalizer run while run copies our environment adds variables to it
+  -- (setenv, through the FFI: the test needs no other library).
+  env_grows_during_gc = function()
+    local ffi = require "ffi"
+    ffi.cdef [[
+      int setenv(const char *name, const char *value, int overwrite);
+      int unsetenv(const char *name);
+    ]]
+    local added = 0
+    local opts = { env = { LUST_T = "x", HOME = false } }
+    local n = T.during_gc(function()
+      for _ = 1, 200 do
+        local status, out = proc.run({ "sh", "-c", 'echo "$LUST_T${HOME:+home}"' }, opts)
+        T.eq(status, 0)
+        T.eq(out, "x\n")
+      end
+    end, function()
+      for _ = 1, 20 do
+        added = added + 1
+        ffi.C.setenv("LUST_GC_" .. added, "v", 1)
+      end
+    end)
+    for i = 1, added do ffi.C.unsetenv("LUST_GC_" .. i) end
+    assert(n > 0, "no finalizer ran")
+  end,
 }
