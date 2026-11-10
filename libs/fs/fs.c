@@ -81,13 +81,13 @@ static const char *const stat_keys[K_N] = {
 /*
  * Per Lua state (an upvalue of list), it owns what a list holds while
  * pushing names may raise a Lua error (out of memory): the directory's
- * descriptor, closed after the listing, by the next call at the latest,
- * or by __gc. And the buffer for the entries, allocated on the first
- * list, kept until __gc.
+ * descriptor, closed after the listing or by __gc. And the buffer for the
+ * entries, allocated on the first list, kept until __gc.
  *
- * A __gc metamethod run by an allocation of list may call list again: a
- * call finding the State busy uses one of its own (that also happens
- * after a list raised, which leaves it busy: only costs speed).
+ * A call finding the State busy replaces it with a new one (see l_list):
+ * it is either used by the call this one runs within (a __gc metamethod
+ * run by an allocation of list called list again), or was left busy by a
+ * call that raised.
  */
 typedef struct {
   int fd;     /* -1: none */
@@ -234,14 +234,23 @@ static State *push_state(lua_State *L) {
  * the tables.
  */
 static int l_list(lua_State *L) {
-  State *st = (State *)lua_touserdata(L, lua_upvalueindex(1));
   const char *path = check_path(L, 1);
   int types = 0, names_idx = 0, types_idx = 0, n = 0, e = 0;
+  State *st;
 
   parse_opts(L, 2, list_opt, &types);
-  if (st->busy) st = push_state(L);
-  /* What an earlier call left behind when it raised an error. */
-  state_close(st);
+  /* The State on the stack, too: a call this one runs (see State) may
+   * replace the upvalue, this one keeps using it. */
+  lua_pushvalue(L, lua_upvalueindex(1));
+  st = (State *)lua_touserdata(L, -1);
+  if (st->busy) {
+    /* A new one, for this call and the later ones. The old one is
+     * released by its __gc: once the call using it is done, or soon
+     * (that call raised, it is garbage now). */
+    st = push_state(L);
+    lua_pushvalue(L, -1);
+    lua_replace(L, lua_upvalueindex(1));
+  }
   if (st->buf == NULL && (st->buf = (char *)malloc(DIRBUF_SIZE)) == NULL)
     return luaL_error(L, "not enough memory");
   st->fd = open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
