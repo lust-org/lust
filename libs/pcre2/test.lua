@@ -297,4 +297,49 @@ T.run {
     for _ = 1, 20000 do pcre2.new("(a+)(b+)"):test("aabb") end
     collectgarbage()
   end,
+
+  -- A finalizer run while a call pushes its results matches with the same
+  -- regexp (whose match data every match of it shares): the outer call's
+  -- results must stay its own. The outer checks allocate nothing, so the
+  -- finalizer runs within the calls.
+  same_regexp_during_gc = function()
+    local function run(re, inner_subject)
+      local parts = {}
+      for i = 1, 20000 do parts[i] = "k" .. i .. "=" .. i end
+      local big = table.concat(parts, " ")
+      local n = T.during_gc(function()
+        for _ = 1, 3 do
+          local count = 0
+          for k, v in re:gmatch(big) do -- "k<i>", "<i>"
+            count = count + 1
+            T.eq(#k == #v + 1 and k:byte(1) == 107, true, "gmatch")
+          end
+          T.eq(count, 20000)
+          local out, nsub = re:gsub(big, "\\2\\1")
+          T.eq(nsub, 20000)
+          T.eq(#out, #big - 20000 * 1, "gsub")
+          local init, found = 1, 0
+          while true do
+            local a, b, k, v = re:find(big, init)
+            if not a then break end
+            T.eq(b - a + 1, #k + #v + 1, "find")
+            found, init = found + 1, b + 1
+            if found % 1000 == 0 then
+              local c = re:captures(big, a)
+              T.eq(c[1], k, "captures")
+              T.eq(c[0], k .. "=" .. v)
+            end
+          end
+          T.eq(found, 20000)
+        end
+      end, function()
+        local c = re:captures(inner_subject)
+        T.eq(c[1] .. "|" .. c[2], "zz|9", "inner")
+      end)
+      assert(n > 0, "no finalizer ran")
+    end
+    run(new("(\\w+)=(\\d+)"), "zz=9")
+    -- more groups than the offsets of a call have room for on the C stack
+    run(new("(\\w+)=(\\d+)" .. ("()"):rep(20)), "zz=9")
+  end,
 }

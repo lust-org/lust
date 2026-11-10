@@ -57,8 +57,9 @@
  * A compiled regexp, the userdata of a Lua regexp object. It bundles the
  * pattern with the match data and the limits, so a match allocates nothing.
  * The match data is shared by all matches of this regexp: the offsets in it
- * are only valid until the next match, callbacks of gsub must not rely on
- * them (see l_gsub).
+ * are only valid until the next match, which may also be one by a callback
+ * of gsub or a finalizer (docs/gc-reentrancy.md). So exec copies them out
+ * right away (see Offsets).
  */
 typedef struct {
   pcre2_code *code;
@@ -270,16 +271,33 @@ static int start_offset(lua_State *L, int arg, size_t len, size_t *pos) {
 }
 
 /*
+ * The offsets of a match (pairs of start and end, exclusive; PCRE2_UNSET
+ * for a group that did not take part), whole match first: a copy, owned
+ * by the call. For this many pairs a local array (in the caller's frame)
+ * is the room, more get a userdata (see offsets).
+ */
+#define OV_LOCAL 16
+typedef struct {
+  PCRE2_SIZE local[2 * OV_LOCAL];
+} Offsets;
+
+/* Room for the offsets of r's matches: o's array, or a new userdata
+ * (pushed; regexps with OV_LOCAL or more groups). */
+static PCRE2_SIZE *offsets(lua_State *L, const Re *r, Offsets *o) {
+  if (r->ngroups < OV_LOCAL) return o->local;
+  return (PCRE2_SIZE *)lua_newuserdata(L, 2 * ((size_t)r->ngroups + 1) * sizeof(PCRE2_SIZE));
+}
+
+/*
  * Match s[0, len) starting at the 0-based offset `pos`; the text before
  * pos still counts as context for ^, \b and lookbehinds. Returns 1 on a
- * match, with the offsets of the whole match and all groups in *ov (pairs
- * of start and end, exclusive; PCRE2_UNSET for a group that did not take
- * part), and 0 if there is none. Raises an error if matching fails: invalid
- * UTF-8 in the subject, or one of the limits (match_limit, depth_limit,
- * max_mem) was hit.
+ * match, with the offsets of the whole match and all groups copied to ov
+ * (room from `offsets`; NULL: not needed), and 0 if there is none. Raises
+ * an error if matching fails: invalid UTF-8 in the subject, or one of the
+ * limits (match_limit, depth_limit, max_mem) was hit.
  */
 static int exec(lua_State *L, const Re *r, const char *s, size_t len,
-                size_t pos, uint32_t mflags, const PCRE2_SIZE **ov) {
+                size_t pos, uint32_t mflags, PCRE2_SIZE *ov) {
   int rc = pcre2_match(r->code, (PCRE2_SPTR)s, len, pos, mflags, r->md, r->mctx);
   if (rc == PCRE2_ERROR_NOMATCH) return 0;
   if (rc < 0) {
@@ -288,7 +306,10 @@ static int exec(lua_State *L, const Re *r, const char *s, size_t len,
       strcpy(msg, "match error");
     return luaL_error(L, "lust.pcre2: %s", msg);
   }
-  *ov = pcre2_get_ovector_pointer(r->md);
+  /* (before anything may run a GC step, or a finalizer matching with r) */
+  if (ov != NULL)
+    memcpy(ov, pcre2_get_ovector_pointer(r->md),
+           2 * ((size_t)r->ngroups + 1) * sizeof(PCRE2_SIZE));
   return 1;
 }
 
@@ -320,12 +341,11 @@ static int l_test(lua_State *L) {
   const Re *r = check_re(L, 1);
   size_t len, pos;
   const char *s = luaL_checklstring(L, 2, &len);
-  const PCRE2_SIZE *ov = NULL; /* set by a successful match */
   if (!start_offset(L, 3, len, &pos)) {
     lua_pushboolean(L, 0);
     return 1;
   }
-  lua_pushboolean(L, exec(L, r, s, len, pos, 0, &ov));
+  lua_pushboolean(L, exec(L, r, s, len, pos, 0, NULL));
   return 1;
 }
 
@@ -334,8 +354,11 @@ static int l_find(lua_State *L) {
   const Re *r = check_re(L, 1);
   size_t len, pos;
   const char *s = luaL_checklstring(L, 2, &len);
-  const PCRE2_SIZE *ov = NULL; /* set by a successful match */
-  if (!start_offset(L, 3, len, &pos) || !exec(L, r, s, len, pos, 0, &ov)) {
+  Offsets o;
+  PCRE2_SIZE *ov;
+  /* (the room after reading the arguments: it may push a userdata) */
+  if (!start_offset(L, 3, len, &pos) ||
+      !exec(L, r, s, len, pos, 0, ov = offsets(L, r, &o))) {
     lua_pushnil(L);
     return 1;
   }
@@ -350,8 +373,11 @@ static int l_match(lua_State *L) {
   const Re *r = check_re(L, 1);
   size_t len, pos;
   const char *s = luaL_checklstring(L, 2, &len);
-  const PCRE2_SIZE *ov = NULL; /* set by a successful match */
-  if (!start_offset(L, 3, len, &pos) || !exec(L, r, s, len, pos, 0, &ov)) {
+  Offsets o;
+  PCRE2_SIZE *ov;
+  /* (the room after reading the arguments: it may push a userdata) */
+  if (!start_offset(L, 3, len, &pos) ||
+      !exec(L, r, s, len, pos, 0, ov = offsets(L, r, &o))) {
     lua_pushnil(L);
     return 1;
   }
@@ -363,8 +389,9 @@ static int l_fullmatch(lua_State *L) {
   const Re *r = check_re(L, 1);
   size_t len;
   const char *s = luaL_checklstring(L, 2, &len);
-  const PCRE2_SIZE *ov = NULL; /* set by a successful match */
-  if (!exec(L, r, s, len, 0, PCRE2_ANCHORED | PCRE2_ENDANCHORED, &ov)) {
+  Offsets o;
+  PCRE2_SIZE *ov = offsets(L, r, &o);
+  if (!exec(L, r, s, len, 0, PCRE2_ANCHORED | PCRE2_ENDANCHORED, ov)) {
     lua_pushnil(L);
     return 1;
   }
@@ -407,12 +434,15 @@ static int l_captures(lua_State *L) {
   const Re *r = check_re(L, 1);
   size_t len, pos;
   const char *s = luaL_checklstring(L, 2, &len);
-  const PCRE2_SIZE *ov = NULL; /* set by a successful match */
+  Offsets o;
+  PCRE2_SIZE *ov;
   Names nm;
   uint32_t i;
   int t;
 
-  if (!start_offset(L, 3, len, &pos) || !exec(L, r, s, len, pos, 0, &ov)) {
+  /* (the room after reading the arguments: it may push a userdata) */
+  if (!start_offset(L, 3, len, &pos) ||
+      !exec(L, r, s, len, pos, 0, ov = offsets(L, r, &o))) {
     lua_pushnil(L);
     return 1;
   }
@@ -462,7 +492,7 @@ static size_t next_char(const Re *r, const char *s, size_t pos, size_t len) {
 
 /*
  * The next match of a global search at or behind the 0-based offset `pos`;
- * the offsets are in *ov as for exec. Returns 0 if there is none.
+ * the offsets are copied to ov as by exec. Returns 0 if there is none.
  *
  * This is Perl's rule: right after an empty match at `pos` (`retry`), a
  * non-empty match at the very same position is tried first; if there is
@@ -474,7 +504,7 @@ static size_t next_char(const Re *r, const char *s, size_t pos, size_t len) {
  * spend time on it again.
  */
 static int scan(lua_State *L, const Re *r, const char *s, size_t len,
-                size_t pos, int retry, int checked, const PCRE2_SIZE **ov) {
+                size_t pos, int retry, int checked, PCRE2_SIZE *ov) {
   while (pos <= len) {
     uint32_t mflags = checked ? PCRE2_NO_UTF_CHECK : 0;
     if (retry) mflags |= PCRE2_ANCHORED | PCRE2_NOTEMPTY_ATSTART;
@@ -512,10 +542,12 @@ typedef struct {
 /* __call of a gmatch loop (the arguments of the generic `for` are ignored) */
 static int gmatch_iter(lua_State *L) {
   Gmatch *g = (Gmatch *)luaL_checkudata(L, 1, GMATCH_MT);
-  const PCRE2_SIZE *ov = NULL; /* set by a successful match */
+  Offsets o;
+  PCRE2_SIZE *ov;
 
   if (g->pos > g->len) return 0;
-  if (!scan(L, g->r, g->s, g->len, g->pos, g->retry, g->checked, &ov)) {
+  ov = offsets(L, g->r, &o);
+  if (!scan(L, g->r, g->s, g->len, g->pos, g->retry, g->checked, ov)) {
     g->pos = g->len + 1; /* done */
     return 0;
   }
@@ -613,7 +645,8 @@ static int l_gsub(lua_State *L) {
   int retry = 0, checked = 0;
   const char *repl = NULL;
   lua_Number max = 0, count = 0;
-  const PCRE2_SIZE *ov = NULL; /* set by a successful match */
+  Offsets o;
+  PCRE2_SIZE *ov;
   luaL_Buffer b;
 
   if (rtype == LUA_TNUMBER || rtype == LUA_TSTRING) {
@@ -624,10 +657,11 @@ static int l_gsub(lua_State *L) {
   }
   if (has_max) max = luaL_checknumber(L, 4);
 
+  ov = offsets(L, r, &o); /* (before the buffer: may push a userdata) */
   luaL_buffinit(L, &b);
   while (pos <= len && (!has_max || count < max)) {
-    size_t a, e; /* the match, copied out of ov: callbacks may reuse it */
-    if (!scan(L, r, s, len, pos, retry, checked, &ov)) break;
+    size_t a, e; /* the match */
+    if (!scan(L, r, s, len, pos, retry, checked, ov)) break;
     checked = 1;
     a = ov[0];
     e = ov[1];
@@ -642,7 +676,6 @@ static int l_gsub(lua_State *L) {
         int n;
         lua_pushvalue(L, 3);
         n = push_captures(L, r, s, ov);
-        /* From here on, ov may be overwritten by the callback. */
         lua_call(L, n, 1);
       } else {
         push_group(L, s, ov, r->ngroups == 0 ? 0 : 1);
