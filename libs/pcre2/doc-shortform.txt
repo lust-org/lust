@@ -8,9 +8,6 @@ new(pattern [, opts]): re | nil, err
 quote(str): str
   Escapes str so that it matches literally
 
-version: str
-  PCRE2's version
-
 re:test(s [, init]): bool
   Does s match? init is 1-based, may be negative
 

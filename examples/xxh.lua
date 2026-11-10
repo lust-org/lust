@@ -4,8 +4,6 @@
 
 local xxh = require "lust.xxh"
 
-print("xxHash version:", xxh.version())
-
 for _, s in ipairs { "", "abc", "hello world" } do
   -- xxh32 returns a Lua number, xxh64 a hex string (64 bit do not fit
   -- into a double).

@@ -6,7 +6,6 @@
  *   xxh.xxh64("abc")        --> "44bc2cf5ad770999" (hex: 64 bit do not fit
  *                               a Lua number)
  *   xxh.xxh64("abc", seed)
- *   xxh.version()           --> "0.8.4"
  */
 #include <stdio.h>
 
@@ -41,16 +40,9 @@ static int l_xxh64(lua_State *L) {
   return 1;
 }
 
-static int l_version(lua_State *L) {
-  lua_pushfstring(L, "%d.%d.%d", XXH_VERSION_MAJOR, XXH_VERSION_MINOR,
-                  XXH_VERSION_RELEASE);
-  return 1;
-}
-
 static const luaL_Reg funcs[] = {
     {"xxh32", l_xxh32},
     {"xxh64", l_xxh64},
-    {"version", l_version},
     {NULL, NULL},
 };
 

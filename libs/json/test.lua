@@ -25,10 +25,6 @@ local function roundtrip(v)
 end
 
 T.run {
-  version = function()
-    assert(json.version:match("^%d+%.%d+%.%d+$"))
-  end,
-
   decode_scalars = function()
     T.eq(json.decode("1"), 1)
     T.eq(json.decode(" -12.5e1 "), -125)

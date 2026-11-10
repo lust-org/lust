@@ -21,7 +21,6 @@
  *   pcre2.new("a.c", {caseless = true, dotall = true})
  *   pcre2.new("(") --> nil, "missing closing parenthesis (at position 2)"
  *   pcre2.quote("a.b")                    --> "a\\.b"
- *   pcre2.version                         --> "10.49 2026-09-28"
  *
  * Positions (also in error messages) are 1-based byte offsets like in
  * string.find; `init` may be negative. A group that did not take part in a
@@ -729,8 +728,6 @@ static const luaL_Reg funcs[] = {
 };
 
 LUST_API int luaopen_lust_pcre2(lua_State *L) {
-  char version[64];
-
   /* metatable: methods through __index, release through __gc */
   luaL_newmetatable(L, RE_MT);
   lua_newtable(L);
@@ -746,10 +743,5 @@ LUST_API int luaopen_lust_pcre2(lua_State *L) {
 
   lua_newtable(L);
   luaL_register(L, NULL, funcs);
-  /* version of the linked PCRE2, e.g. "10.49 2026-09-28" */
-  version[0] = '\0';
-  pcre2_config(PCRE2_CONFIG_VERSION, version);
-  lua_pushstring(L, version);
-  lua_setfield(L, -2, "version");
   return 1;
 }

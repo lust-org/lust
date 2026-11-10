@@ -1,0 +1,4 @@
+versions(): table
+  Versions of lust, of the running LuaJIT and of the dependencies bundled
+  with the libraries in this build, as strings: lust, luajit (jit.version
+  without "LuaJIT "), xxhash, yyjson, pcre2

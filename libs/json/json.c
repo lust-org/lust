@@ -667,8 +667,6 @@ LUST_API int luaopen_lust_json(lua_State *L) {
   lua_setfield(L, 1, "null");
   lua_pushlightuserdata(L, &empty_array_tag);
   lua_setfield(L, 1, "empty_array");
-  lua_pushstring(L, YYJSON_VERSION_STRING);
-  lua_setfield(L, 1, "version");
 
   lua_settop(L, 1);
   return 1;

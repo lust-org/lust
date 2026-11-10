@@ -30,6 +30,7 @@ print(xxh.xxh64("abc")) --> 44bc2cf5ad770999
 | `lust.sys.random` | cryptographically secure random bytes | none (libc) |
 | `lust.sys.term` | terminal detection and size | none (libc) |
 | `lust.sys.signal` | Lua callbacks for signals | none (libc) |
+| `lust.meta` | versions of lust, LuaJIT and the bundled dependencies | none (their headers) |
 
 A library can be in a namespace: `lust.sys.proc` is a library of its own
 (`lust/sys/proc.so`), `sys` only groups it with the others, there is no

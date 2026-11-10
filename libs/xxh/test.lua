@@ -16,10 +16,6 @@ T.run {
     assert(xxh.xxh64("abc", 1) ~= xxh.xxh64("abc"))
   end,
 
-  version = function()
-    assert(xxh.version():match("^%d+%.%d+%.%d+$"))
-  end,
-
   argument_errors = function()
     T.raises(function() xxh.xxh64() end, "bad argument #1")
     T.raises(function() xxh.xxh64("x", -1) end, "seed must be")

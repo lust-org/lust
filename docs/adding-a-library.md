@@ -46,6 +46,9 @@ contain no `_` (`sys_env` would clash with `sys.env`).
    PCRE2) the source lists are kept in `vendor/meson.build`; after
    upgrading RE2/Abseil run `tools/absl-sources.py --check`, after
    upgrading PCRE2 compare the list with `vendor/pcre2/CMakeLists.txt`.
+   Make its version part of `lust.meta.versions()`: add it to the
+   table in `libs/meta/meson.build` and to `libs/meta/meta.c`. A library
+   exports no `version` of its own.
 
 The `.so`, the static archive for `lust`, install rules and both flavours
 of the tests are derived automatically.

@@ -7,10 +7,6 @@ local function new(...) return assert(pcre2.new(...)) end
 local function pack(...) return { n = select("#", ...), ... } end
 
 T.run {
-  version = function()
-    assert(pcre2.version:find("^10%.%d+"), pcre2.version)
-  end,
-
   test = function()
     local re = new("a+b")
     T.eq(re:test("xxaab"), true)

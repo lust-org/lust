@@ -19,6 +19,3 @@ empty_array: userdata
 
 array_mt: table
   Metatable that makes an empty table encode as []
-
-version: str
-  yyjson's version

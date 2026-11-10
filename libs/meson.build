@@ -51,6 +51,7 @@ all_libs = [
   'sys.term',
   'sys.signal',
   'sys.proc',
+  'meta',
 ]
 
 requested = get_option('libs')
