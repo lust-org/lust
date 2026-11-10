@@ -1,7 +1,7 @@
 /*
- * lust.fs: file system basics the Lua standard library lacks.
+ * lust.sys.fs: file system basics the Lua standard library lacks.
  *
- *   local fs = require "lust.fs"
+ *   local fs = require "lust.sys.fs"
  *   fs.list("src")                    --> { "a.c", "b.c", ... }
  *   fs.list("src", { types = true })  --> { "a.c", ... }, { "file", ... }
  *   fs.stat("a.c")                    --> { type = "file", size = 12, ... }
@@ -47,10 +47,10 @@
 #ifndef LUST_LUA_BC_H
 #error "LUST_LUA_BC_H must be defined (by libs/lust/meson.build)"
 #endif
-/* luaJIT_BC_lust_fs[] and luaJIT_BC_lust_fs_SIZE: the bytecode of fs.lua */
+/* luaJIT_BC_lust_sys_fs[] and luaJIT_BC_lust_sys_fs_SIZE: the bytecode of fs.lua */
 #include LUST_LUA_BC_H
 
-#define STATE_MT "lust.fs.state"
+#define STATE_MT "lust.sys.fs.state"
 
 /* Prefix of the names tempfile/tempdir create, unless opts.prefix */
 #define DEFAULT_PREFIX "lust-"
@@ -599,10 +599,10 @@ static int l_walkdir(lua_State *L) {
   lua_settop(L, 2);
 
   if (lua_isnil(L, lua_upvalueindex(1))) {
-    if (luaL_loadbuffer(L, (const char *)luaJIT_BC_lust_fs, luaJIT_BC_lust_fs_SIZE,
-                        "=lust.fs") != 0)
+    if (luaL_loadbuffer(L, (const char *)luaJIT_BC_lust_sys_fs,
+                        luaJIT_BC_lust_sys_fs_SIZE, "=lust.sys.fs") != 0)
       return luaL_error(L,
-                        "lust.fs: cannot load the embedded bytecode (%s); it "
+                        "lust.sys.fs: cannot load the embedded bytecode (%s); it "
                         "was built for a different LuaJIT than the running one",
                         lua_tostring(L, -1));
     lua_pushvalue(L, lua_upvalueindex(2));
@@ -642,7 +642,7 @@ static const luaL_Reg funcs[] = {
 #define MOD_IDX 1
 #define TYPES_IDX 2 /* TY_N type names, then the K_N stat keys */
 
-LUST_API int luaopen_lust_fs(lua_State *L) {
+LUST_API int luaopen_lust_sys_fs(lua_State *L) {
   int i;
 
   lua_settop(L, 0); /* (the module name) */

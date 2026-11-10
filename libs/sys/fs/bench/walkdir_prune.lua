@@ -1,6 +1,6 @@
 -- Walking the tree of walkdir.lua, pruning "dir1" (prune is called per
 -- directory).
-local fs = require "lust.fs"
+local fs = require "lust.sys.fs"
 local tree = dofile(arg[0]:gsub("[^/]*$", "") .. "_tree.lua")
 
 local root = tree.tree(4, 2, 60)

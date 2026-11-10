@@ -1,9 +1,9 @@
--- lust.fs: list, walk and inspect directories, create directories and
+-- lust.sys.fs: list, walk and inspect directories, create directories and
 -- temporary files.
 --
 --   build/src/lust examples/fs.lua
 
-local fs = require "lust.fs"
+local fs = require "lust.sys.fs"
 
 -- A scratch directory only we can access, with a small tree in it.
 local root = assert(fs.tempdir { prefix = "fs-example-" })

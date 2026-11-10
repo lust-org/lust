@@ -26,7 +26,7 @@
    - a `capi` library may have a Lua part too (`lib_lua`, for code that
      reads better in Lua): its bytecode is handed to the C code as
      `LUST_LUA_BC_H` to `#include`; load it lazily on first use like
-     `libs/fs/fs.c` does, so `require` stays cheap and the C functions keep
+     `libs/sys/fs/fs.c` does, so `require` stays cheap and the C functions keep
      working on a stock luajit whose bytecode format differs,
    - the Lua part of a library must not contain table constructors
      with named fields (`{ a = 1 }`, `{ a = f() }`): the compiled bytecode

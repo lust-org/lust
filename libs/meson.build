@@ -17,7 +17,7 @@
 #      is better written in Lua): it is compiled to bytecode the same way
 #      and the C code gets it as LUST_LUA_BC_H to #include, which defines
 #      luaJIT_BC_lust_<name>[] and luaJIT_BC_lust_<name>_SIZE; the C code
-#      decides when to load it (see libs/fs/fs.c: lazily, on first use).
+#      decides when to load it (see libs/sys/fs/fs.c: lazily, on first use).
 #
 #      Every library also MUST have a doc-shortform.txt: its API as
 #      succinct as possible, which becomes part of `lust`'s help text
@@ -44,7 +44,7 @@ all_libs = [
   'xxh',
   'pcre2',
   'json',
-  'fs',
+  'sys.fs',
   'sys.time',
   'sys.random',
   'sys.env',

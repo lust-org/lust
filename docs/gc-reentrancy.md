@@ -82,7 +82,7 @@ A library with state shared between calls (rule 2) tests a call that
 runs within a call of its own: `T.during_gc(fn, inner)` (`tests/t.lua`)
 runs `fn` while a finalizer runs `inner` (and returns how often it ran),
 both check their results. Use big inputs, so that the finalizer runs
-inside the library's allocations (see `libs/fs/test.lua`,
+inside the library's allocations (see `libs/sys/fs/test.lua`,
 `list_during_gc`).
 
 Don't arm finalizers by hand: one still armed at exit runs after stock

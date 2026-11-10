@@ -1,4 +1,4 @@
-# lust.fs: file system basics (directory listing, stat, mkdir, temporary
+# lust.sys.fs: file system basics (directory listing, stat, mkdir, temporary
 # files and directories). Plain libc, no dependencies, so it costs nothing
 # at startup and is linked into `lust`.
 lib_sources = files('fs.c')

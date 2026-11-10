@@ -1,5 +1,5 @@
 -- Walking the tree of walkdir.lua with a max_depth (64 entries of 304).
-local fs = require "lust.fs"
+local fs = require "lust.sys.fs"
 local tree = dofile(arg[0]:gsub("[^/]*$", "") .. "_tree.lua")
 
 local root = tree.tree(4, 2, 60)

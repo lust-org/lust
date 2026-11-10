@@ -7,7 +7,7 @@
 -- traces (and the count) differ from run to run by up to 30%, depending
 -- on which entry of the iterator gets hot first. That depends on where
 -- LuaJIT's allocator, which is randomized, puts the bytecode.
-local fs = require "lust.fs"
+local fs = require "lust.sys.fs"
 local tree = dofile(arg[0]:gsub("[^/]*$", "") .. "_tree.lua")
 
 local root, n = tree.tree(4, 2, 60)

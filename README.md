@@ -23,7 +23,7 @@ print(xxh.xxh64("abc")) --> 44bc2cf5ad770999
 | `lust.xxh`  | xxHash              | `vendor/xxhash`, linked statically      |
 | `lust.pcre2` | PCRE2 (Perl compatible) regular expressions | `vendor/pcre2`, linked statically |
 | `lust.json` | JSON (2 to 4 times faster than lua-cjson, see `libs/json/vs-cjson.lua`) | `vendor/yyjson`, linked statically |
-| `lust.fs`   | file system: list, walk, stat, readlink, mkdir, temporary files | none (libc) |
+| `lust.sys.fs` | file system: list, walk, stat, readlink, mkdir, temporary files | none (libc) |
 | `lust.sys.proc` | run programs without a shell, capture their output | none (libc) |
 | `lust.sys.env` | set and unset environment variables | none (libc) |
 | `lust.sys.time` | monotonic clock | none (libc) |
@@ -40,7 +40,7 @@ Libraries come in two kinds (`lib_kind` in their `meson.build`):
 
 - `capi`: classic Lua C API module (all libraries at the moment). The
   default, and cheapest to `require`. It may have a Lua
-  part for what reads better in Lua, embedded as bytecode (`lust.fs`'s
+  part for what reads better in Lua, embedded as bytecode (`lust.sys.fs`'s
   `walkdir`).
 - `ffi`: [static FFI bindings](https://evo-lua.github.io/docs/background-information/luajit/static-ffi-bindings/).
   The C code is plain C that knows nothing about Lua and just exports

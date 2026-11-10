@@ -1,7 +1,7 @@
 -- Helpers of the benchmarks: scratch trees below a fresh temporary
 -- directory, and their removal (no os.execute: perf would count the
 -- instructions of the shell and rm, too).
-local fs = require "lust.fs"
+local fs = require "lust.sys.fs"
 
 local M = {}
 

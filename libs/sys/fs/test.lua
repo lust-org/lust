@@ -1,5 +1,5 @@
 local T = require "t"
-local fs = require "lust.fs"
+local fs = require "lust.sys.fs"
 
 -- A call that failed softly: nil, a message containing `needle`, `code`.
 local function fails(code, needle, v, err, c)

@@ -21,7 +21,7 @@
  *
  * Failing to start the program (not found, not executable, no such cwd,
  * out of descriptors) returns nil, "<program>: <reason>", "<errno name>"
- * (like lust.fs). Misuse raises, see docs/error-handling.md.
+ * (like lust.sys.fs). Misuse raises, see docs/error-handling.md.
  */
 #define _GNU_SOURCE /* pipe2, strerrorname_np, sigabbrev_np, posix_spawn_file_actions_*_np */
 

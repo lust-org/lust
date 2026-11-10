@@ -1,5 +1,5 @@
 -- Listing a directory of 300 files, names only and with types.
-local fs = require "lust.fs"
+local fs = require "lust.sys.fs"
 local tree = dofile(arg[0]:gsub("[^/]*$", "") .. "_tree.lua")
 
 local dir = tree.tree(0, 1, 300)

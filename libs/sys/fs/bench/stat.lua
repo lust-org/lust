@@ -1,6 +1,6 @@
 -- stat of existing (also not following links) and missing files, and
 -- readlink.
-local fs = require "lust.fs"
+local fs = require "lust.sys.fs"
 local tree = dofile(arg[0]:gsub("[^/]*$", "") .. "_tree.lua")
 
 local dir = tree.tree(0, 1, 50)

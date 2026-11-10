@@ -1,7 +1,7 @@
 -- stat into one reused table (fs.stat(path, opts, t)), of existing and
 -- missing files. A file of its own: stat.lua measures the new table per
 -- call, and loops in one file share traces (see walkdir.lua).
-local fs = require "lust.fs"
+local fs = require "lust.sys.fs"
 local tree = dofile(arg[0]:gsub("[^/]*$", "") .. "_tree.lua")
 
 local dir = tree.tree(0, 1, 50)

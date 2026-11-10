@@ -1,6 +1,6 @@
 -- Creating (and removing) directories, also with missing parents, and
 -- temporary files and directories.
-local fs = require "lust.fs"
+local fs = require "lust.sys.fs"
 
 local root = assert(fs.tempdir())
 local parents = { parents = true }

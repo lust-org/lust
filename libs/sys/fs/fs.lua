@@ -1,4 +1,4 @@
--- Lua part of lust.fs: walkdir. Compiled to bytecode and embedded, loaded
+-- Lua part of lust.sys.fs: walkdir. Compiled to bytecode and embedded, loaded
 -- by the first fs.walkdir call (see fs.c), which checks the arguments and
 -- calls the function returned here with plain values.
 --
