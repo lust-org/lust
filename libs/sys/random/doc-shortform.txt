@@ -1,0 +1,4 @@
+bytes(n): str
+  n cryptographically secure random bytes from the kernel (getrandom),
+  for keys, tokens, nonces (math.random() is predictable from its
+  outputs)

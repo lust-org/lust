@@ -46,6 +46,7 @@ all_libs = [
   'json',
   'fs',
   'sys.time',
+  'sys.random',
 ]
 
 requested = get_option('libs')
