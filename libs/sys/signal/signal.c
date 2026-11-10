@@ -191,6 +191,12 @@ static int check_signal(lua_State *L, int arg) {
  * Pushes the callbacks table of this state, creating it (and the guard)
  * and making this state the owner on first use. Raises if another state
  * is the owner.
+ *
+ * Creating them allocates, which may run a finalizer calling on, too
+ * (docs/gc-reentrancy.md): everything is allocated first, then checked
+ * again and put in place with nothing in between that runs a GC step.
+ * Else both calls would make a guard, and the one left over would, when
+ * collected, stop handling all signals behind the other's back.
  */
 static void push_callbacks(lua_State *L) {
   lua_pushlightuserdata(L, &callbacks_key);
@@ -199,19 +205,34 @@ static void push_callbacks(lua_State *L) {
   lua_pop(L, 1);
   if (owner != NULL) luaL_error(L, "signals are handled by another Lua state");
 
-  lua_pushlightuserdata(L, &guard_key);
+  /* the guard (its metatable is set last: an unused one must not run its
+   * __gc), the metatable, the callbacks table */
   lua_newuserdata(L, 1);
   lua_createtable(L, 0, 1);
   lua_pushcfunction(L, l_guard_gc);
   lua_setfield(L, -2, "__gc");
-  lua_setmetatable(L, -2);
-  lua_rawset(L, LUA_REGISTRYINDEX);
-
   /* (the thread is a value in there, which keeps it alive for the
    * handler) */
   lua_createtable(L, NSIG, 1);
   lua_pushthread(L);
   lua_setfield(L, -2, "thread");
+
+  /* From here on, nothing runs a GC step. Made meanwhile? */
+  lua_pushlightuserdata(L, &callbacks_key);
+  lua_rawget(L, LUA_REGISTRYINDEX);
+  if (!lua_isnil(L, -1)) {
+    lua_replace(L, -4); /* (theirs instead of our guard) */
+    lua_pop(L, 2);
+    return;
+  }
+  lua_pop(L, 1);
+  if (owner != NULL) luaL_error(L, "signals are handled by another Lua state");
+  /* stack: guard, its metatable, callbacks */
+  lua_insert(L, -3);            /* callbacks, guard, metatable */
+  lua_setmetatable(L, -2);      /* callbacks, guard */
+  lua_pushlightuserdata(L, &guard_key);
+  lua_insert(L, -2);
+  lua_rawset(L, LUA_REGISTRYINDEX); /* callbacks */
   lua_pushlightuserdata(L, &callbacks_key);
   lua_pushvalue(L, -2);
   lua_rawset(L, LUA_REGISTRYINDEX);
