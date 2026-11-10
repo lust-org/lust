@@ -1,0 +1,8 @@
+on(sig, callback)
+  Calls callback(sig) when signal sig ("SIGINT", "SIGTERM", "SIGUSR1",
+  ...) arrives, nil restores the handling before. It runs before the next
+  Lua instruction (not within a blocking call, which continues; a loop
+  compiled by the JIT that calls no C function runs on until it exits);
+  an error it raises is raised there. Signals arriving before it ran call
+  it once. Faults (SIGSEGV, ...), SIGABRT, SIGKILL and SIGSTOP cannot be
+  handled. Only one Lua state of a process can have callbacks

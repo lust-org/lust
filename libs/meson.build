@@ -49,6 +49,7 @@ all_libs = [
   'sys.random',
   'sys.env',
   'sys.term',
+  'sys.signal',
 ]
 
 requested = get_option('libs')
