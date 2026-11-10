@@ -32,8 +32,20 @@
 # From these a loadable module `lust/<name>.so` and a static archive (for
 # the `lust` binary) are built. Each library only pulls in its own
 # dependencies, so using one never costs anything for the others.
+#
+# A name may have dots: `sys.env` is `require "lust.sys.env"`, lives in
+# libs/sys/env/, exports `luaopen_lust_sys_env` and is built as
+# lust/sys/env.so (where the stock luajit looks for it). The parts before
+# the last dot are only a namespace: there is no library `sys`, unless one
+# is added like any other. Names have no `_`: `sys_env` and `sys.env`
+# would both export `luaopen_lust_sys_env`.
 
-all_libs = ['xxh', 'pcre2', 'json', 'fs']
+all_libs = [
+  'xxh',
+  'pcre2',
+  'json',
+  'fs',
+]
 
 requested = get_option('libs')
 enabled_libs = requested.length() > 0 ? requested : all_libs
@@ -42,6 +54,11 @@ foreach name : enabled_libs
     error(
       'Unknown library "@0@". Available: @1@'.format(name, ', '.join(all_libs)),
     )
+  endif
+endforeach
+foreach name : all_libs
+  if name.contains('_') or '' in name.split('.')
+    error('Library name "@0@": no "_", no empty parts between dots'.format(name))
   endif
 endforeach
 
@@ -60,7 +77,8 @@ foreach name : enabled_libs
   lib_kind = 'capi' # or 'ffi'
   lib_lua = [] # 'ffi': the Lua file binding the C functions, 'capi': optional Lua part
   lib_embed = true # link into `lust`
-  subdir(name)
+  dir = name.replace('.', '/') # (libs/sys/env/ for sys.env)
+  subdir(dir)
   if lib_kind not in ['capi', 'ffi']
     error('@0@: lib_kind must be "capi" or "ffi"'.format(name))
   endif
@@ -69,15 +87,18 @@ foreach name : enabled_libs
   endif
   lib_infos += {
     name: {
+      'dir': dir,
+      # C identifier: luaopen_lust_<id>, luaJIT_BC_lust_<id>
+      'id': name.replace('.', '_'),
       'kind': lib_kind,
       'sources': lib_sources,
       'lua': lib_lua,
       'embed': lib_embed,
       'deps': lib_deps,
       # (missing file: meson fails at configure time)
-      'doc': files(name / 'doc-shortform.txt'),
+      'doc': files(dir / 'doc-shortform.txt'),
       # (as a path for command lines: File.full_path() needs meson 1.4)
-      'doc_path': meson.current_source_dir() / name / 'doc-shortform.txt',
+      'doc_path': meson.current_source_dir() / dir / 'doc-shortform.txt',
     },
   }
 endforeach

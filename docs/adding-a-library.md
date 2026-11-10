@@ -33,6 +33,11 @@
      (`tests/test_bytecode.py`).
    - errors follow the conventions in [Error handling](error-handling.md).
 2. Add `<name>` to `all_libs` in `libs/meson.build`.
+
+A library can be in a namespace: `sys.env` (`require "lust.sys.env"`)
+lives in `libs/sys/env/`, exports `luaopen_lust_sys_env` and is built as
+`lust/sys/env.so`. The namespace itself (`sys`) is no library. Names
+contain no `_` (`sys_env` would clash with `sys.env`).
 3. For a static dependency, add it to `vendor/vendor.toml`, vendor it
    with `vendor.py` and declare a `<dep>_dep` for it in
    `vendor/meson.build` (see `xxhash_dep`). Never add files inside

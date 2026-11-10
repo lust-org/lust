@@ -5,11 +5,22 @@
 # directory mirrors that layout in the build tree (build/libs/lust/*.so),
 # so the build directory can be used directly through
 # LUA_CPATH=build/libs/?.so (that is what the tests do).
+#
+# For a library in a namespace (sys.env: lust/sys/env.so) the namespace
+# directory is the name_prefix of the module (`sys/`): meson places the
+# output there (that works from 1.3.0 on, a subdir() per namespace would
+# have to repeat all of this).
+
+fs = import('fs')
 
 foreach name, info : lib_infos
   deps = [lust_dep] + info['deps']
   sources = info['sources']
   c_args = []
+  id = info['id']
+  base = fs.name(info['dir']) # env (for sys/env)
+  parent = fs.parent(info['dir']) # sys (or '.')
+  prefix = parent == '.' ? '' : parent + '/'
 
   if info['lua'].length() > 0
     # The Lua part is compiled to (stripped, hence reproducible) bytecode by
@@ -17,10 +28,10 @@ foreach name, info : lib_infos
     # ffi_shim.c, which provides the luaopen function (see there for the
     # details), for 'capi' by the library's own C code.
     bytecode = custom_target(
-      name + '_bc',
+      id + '_bc',
       input: info['lua'],
-      output: name + '_bc.h',
-      command: [luajit_exe, '-b', '-n', 'lust_' + name, '@INPUT@', '@OUTPUT@'],
+      output: id + '_bc.h',
+      command: [luajit_exe, '-b', '-n', 'lust_' + id, '@INPUT@', '@OUTPUT@'],
       # `luajit -b` is implemented by jit/bcsave.lua, which the uninstalled
       # interpreter finds through this.
       env: {'LUA_PATH': luajit_src / 'src' / '?.lua'},
@@ -30,22 +41,22 @@ foreach name, info : lib_infos
   if info['kind'] == 'ffi'
     sources += files('../ffi_shim.c')
     c_args += [
-      '-DLUST_FFI_NAME=' + name,
-      '-DLUST_FFI_BC_H="@0@_bc.h"'.format(name),
+      '-DLUST_FFI_NAME=' + id,
+      '-DLUST_FFI_BC_H="@0@_bc.h"'.format(id),
     ]
   elif info['lua'].length() > 0
-    c_args += '-DLUST_LUA_BC_H="@0@_bc.h"'.format(name)
+    c_args += '-DLUST_LUA_BC_H="@0@_bc.h"'.format(id)
   endif
 
   mod = shared_module(
-    name,
+    base,
     sources,
-    name_prefix: '',
+    name_prefix: prefix,
     c_args: c_args,
     dependencies: deps,
     gnu_symbol_visibility: 'hidden',
     install: true,
-    install_dir: cmoddir / 'lust',
+    install_dir: cmoddir / 'lust' / prefix,
     install_tag: 'lib-' + name,
   )
   shared_mods += mod
@@ -54,7 +65,7 @@ foreach name, info : lib_infos
   if lust_feature.allowed() and info['embed']
     # Same sources again, as a static archive for linking into `lust`.
     archive = static_library(
-      'lust_' + name,
+      'lust_' + id,
       sources,
       c_args: c_args + ['-DLUST_STATIC'],
       dependencies: deps,

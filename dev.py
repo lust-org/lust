@@ -5,7 +5,7 @@ Targets (for `build` and `install`):
   all      everything (the default)
   lust     the statically linked `lust` interpreter
   libs     all libraries as loadable .so modules
-  <name>   a single library, e.g. `xxh` (see libs/)
+  <name>   a single library, e.g. `xxh` or `sys.env` (see libs/)
 
 Examples:
   ./dev.py build                      # everything
@@ -33,11 +33,13 @@ def run(*cmd):
 
 
 def library_names():
-    """Libraries are the libs/<name>/ dirs (libs/lust/ only holds targets)."""
+    """Libraries are the libs/<name>/ dirs with a meson.build, libs/<ns>/<name>/
+    is <ns>.<name> (libs/lust/ only holds targets)."""
+    libs = ROOT / "libs"
     return sorted(
-        p.name
-        for p in (ROOT / "libs").iterdir()
-        if p.name != "lust" and (p / "meson.build").exists()
+        ".".join(p.parent.relative_to(libs).parts)
+        for p in libs.glob("**/meson.build")
+        if p.parent != libs and p.relative_to(libs).parts[0] != "lust"
     )
 
 

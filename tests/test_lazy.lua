@@ -17,9 +17,11 @@ T.run {
     local f = assert(io.open("/proc/self/maps"))
     local maps = f:read("*a")
     f:close()
-    assert(maps:find("/lust/" .. libs[1] .. ".so", 1, true), libs[1] .. " not mapped")
+    -- (lust/sys/env.so for sys.env)
+    local function so(lib) return "/lust/" .. lib:gsub("%.", "/") .. ".so" end
+    assert(maps:find(so(libs[1]), 1, true), libs[1] .. " not mapped")
     for i = 2, #libs do
-      assert(not maps:find("/lust/" .. libs[i] .. ".so", 1, true), libs[i] .. " mapped")
+      assert(not maps:find(so(libs[i]), 1, true), libs[i] .. " mapped")
     end
   end,
 

@@ -20,7 +20,7 @@
 #include "lust_libs.h"
 
 /* Forward declare the entry point of every embedded library. */
-#define X(name) extern int luaopen_lust_##name(lua_State *L);
+#define X(id, name) extern int luaopen_lust_##id(lua_State *L);
 LUST_EMBEDDED_LIBS(X)
 #undef X
 
@@ -28,7 +28,7 @@ static const struct {
   const char *name;
   lua_CFunction open;
 } embedded[] = {
-#define X(name) {"lust." #name, luaopen_lust_##name},
+#define X(id, name) {"lust." name, luaopen_lust_##id},
     LUST_EMBEDDED_LIBS(X)
 #undef X
     {NULL, NULL},

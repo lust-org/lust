@@ -15,7 +15,7 @@ fs = import('fs')
 embedded = []
 foreach name, info : lib_infos
   if info['embed']
-    embedded += 'X(@0@)'.format(name)
+    embedded += 'X(@0@, "@1@")'.format(info['id'], name)
   endif
 endforeach
 # Where `lust` finds the libraries that are not embedded.

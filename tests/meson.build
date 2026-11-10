@@ -25,7 +25,7 @@ foreach name, info : lib_infos
 endforeach
 
 foreach name : enabled_libs
-  lib_test = files('../libs' / name / 'test.lua')
+  lib_test = files('../libs' / lib_infos[name]['dir'] / 'test.lua')
 
   if luajit.found()
     test(
@@ -133,9 +133,9 @@ elif get_option('luajit_xcflags') != ''
   bench_skip = ['--skip', 'custom luajit_xcflags']
 endif
 foreach name : enabled_libs
-  bench_dir = meson.project_source_root() / 'libs' / name / 'bench'
+  bench_dir = meson.project_source_root() / 'libs' / lib_infos[name]['dir'] / 'bench'
   if not fs.is_dir(bench_dir)
-    error('libs/@0@ has no bench/ (see docs/adding-a-library.md)'.format(name))
+    error('libs/@0@ has no bench/ (see docs/adding-a-library.md)'.format(lib_infos[name]['dir']))
   endif
   # The vendored luajit (the VM build `lust` uses), not the one from PATH:
   # its counts must not depend on what the system has installed.

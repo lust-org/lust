@@ -8,7 +8,8 @@
 /* Where the libraries that are not embedded (lib_embed = false) are. */
 #define LUST_CMODDIR "@LUST_CMODDIR@"
 
-/* X-macro list of the libraries linked into this binary. */
+/* X-macro list of the libraries linked into this binary:
+ * X(<C identifier>, "<name>"), e.g. X(sys_env, "sys.env"). */
 #define LUST_EMBEDDED_LIBS(X) @LUST_EMBEDDED_LIBS@
 
 #endif
