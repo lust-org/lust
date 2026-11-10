@@ -463,20 +463,35 @@ typedef struct {
   size_t xs;        /* offset of the XXXXXX in the template */
 } TempOpts;
 
+/* Stack slots of tempfile/tempdir for the strings of the options: the
+ * pointers must not depend on the opts table, which a finalizer run by
+ * an allocation may change (docs/gc-reentrancy.md). */
+enum { TEMP_SLOT_DIR = 2, TEMP_SLOT_PREFIX, TEMP_SLOT_SUFFIX };
+
 static void temp_opt(lua_State *L, int arg, const char *key, void *ud) {
   TempOpts *o = (TempOpts *)ud;
+  int slot;
   if (strcmp(key, "dir") == 0) {
     o->dir = str_opt(L, arg, key);
+    slot = TEMP_SLOT_DIR;
   } else if (strcmp(key, "prefix") == 0 || (o->allow_suffix && strcmp(key, "suffix") == 0)) {
     const char *s = str_opt(L, arg, key);
     /* (the name would end up in another directory) */
     if (strchr(s, '/') != NULL)
       luaL_argerror(L, arg, lua_pushfstring(L, "%s must not contain '/'", key));
-    if (key[0] == 'p') o->prefix = s;
-    else o->suffix = s;
+    if (key[0] == 'p') {
+      o->prefix = s;
+      slot = TEMP_SLOT_PREFIX;
+    } else {
+      o->suffix = s;
+      slot = TEMP_SLOT_SUFFIX;
+    }
   } else {
     bad_opt(L, arg, key);
+    return;
   }
+  lua_pushvalue(L, -1);
+  lua_replace(L, slot);
 }
 
 /*
@@ -491,6 +506,7 @@ static char *push_template(lua_State *L, TempOpts *o) {
 
   o->dir = o->suffix = NULL;
   o->prefix = DEFAULT_PREFIX;
+  lua_settop(L, TEMP_SLOT_SUFFIX); /* (the slots, nil) */
   parse_opts(L, 1, temp_opt, o);
   if (o->dir == NULL) {
     o->dir = getenv("TMPDIR");
