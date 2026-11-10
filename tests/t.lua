@@ -18,6 +18,40 @@ function T.raises(fn, needle)
   end
 end
 
+-- Runs fn() while a __gc finalizer calls inner() whenever the garbage
+-- collector finalizes, i.e. inside the allocations of the library calls
+-- in fn (see docs/gc-reentrancy.md). Returns how often inner ran. fn
+-- should spend its allocations in the library (big inputs, a loop), so
+-- that inner runs within its calls; the GC runs eagerly meanwhile.
+--
+-- LuaJIT drops errors raised in finalizers: inner's first one is raised
+-- here instead. The finalizer is disarmed before T.during_gc returns: at
+-- exit, a stock luajit may have unloaded the library's .so before the
+-- last finalizers run.
+function T.during_gc(fn, inner)
+  local armed, count, inner_err = true, 0, nil
+  local function arm()
+    local p = newproxy(true)
+    getmetatable(p).__gc = function()
+      if not armed then return end
+      count = count + 1
+      local ok, err = pcall(inner)
+      if not ok and inner_err == nil then inner_err = tostring(err) end
+      arm()
+    end
+  end
+  local pause = collectgarbage("setpause", 100)
+  local stepmul = collectgarbage("setstepmul", 1000)
+  arm()
+  local ok, err = pcall(fn)
+  armed = false
+  collectgarbage("setpause", pause)
+  collectgarbage("setstepmul", stepmul)
+  if not ok then error(err, 0) end
+  if inner_err ~= nil then error("in a finalizer: " .. inner_err, 0) end
+  return count
+end
+
 function T.run(tests)
   local names = {}
   for name in pairs(tests) do names[#names + 1] = name end

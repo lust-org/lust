@@ -166,39 +166,25 @@ T.run {
     T.eq(#assert(fs.list(dir)), 500)
   end),
 
-  -- A __gc run by an allocation of list calls list: the inner call must
-  -- neither disturb the outer one nor fail itself.
-  list_called_by_a_finalizer_during_a_list = in_tmp(function(dir)
+  -- A finalizer run by an allocation of list lists, too: neither call
+  -- may disturb the other.
+  list_during_gc = in_tmp(function(dir)
     sh("mkdir " .. dir .. "/big " .. dir .. "/small")
     for i = 1, 2000 do touch(dir .. "/big/f" .. i) end
     touch(dir .. "/small/a")
     touch(dir .. "/small/b")
-    local listing, nested, inner_bad, done = false, 0, nil, false
-    local function arm()
-      local p = newproxy(true)
-      getmetatable(p).__gc = function()
-        -- (not after the test: at exit, a stock luajit may have unloaded
-        -- fs.so already)
-        if done then return end
-        if listing then nested = nested + 1 end
-        local names, types = fs.list(dir .. "/small", { types = true })
-        if not names or sorted(names) ~= "a,b" or types[1] ~= "file" then
-          inner_bad = tostring(names)
-        end
-        arm()
+    local opts = { types = true }
+    local n = T.during_gc(function()
+      for _ = 1, 30 do
+        local names, types = fs.list(dir .. "/big", opts)
+        T.eq(#names, 2000)
+        T.eq(#types, 2000)
       end
-    end
-    arm()
-    for _ = 1, 30 do
-      listing = true
-      local names, types = fs.list(dir .. "/big", { types = true })
-      listing = false
-      T.eq(#names, 2000)
-      T.eq(#types, 2000)
-    end
-    done = true
-    T.eq(inner_bad, nil, "inner list")
-    assert(nested > 0, "no finalizer ran during a list")
+    end, function()
+      local names, types = assert(fs.list(dir .. "/small", opts))
+      T.eq(sorted(names) .. ":" .. types[1] .. types[2], "a,b:filefile")
+    end)
+    assert(n > 0, "no finalizer ran")
     T.eq(#assert(fs.list(dir .. "/big")), 2000)
   end),
 

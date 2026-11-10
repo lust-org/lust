@@ -55,6 +55,13 @@ when its topic comes up; new project-wide conventions go there too.
     luajit, small instruction budget). Don't raise the budget to make a
     library fit; fix the library.
 - Requiring one library must not load any other (`tests/test_lazy.lua`).
+- Any Lua API call that creates an object (a string, table, userdata;
+  `luaL_Buffer`, `luaL_error`) may run `__gc` finalizers, i.e. any Lua
+  code, this library included; LuaJIT drops their errors, so reentrancy
+  can't be refused. Across such a call, hold no unguarded state shared
+  with other calls and no pointers into memory Lua code can change.
+  Which calls, the patterns (`include/lust_scratch.h`) and the test
+  helper (`T.during_gc`): `docs/gc-reentrancy.md`.
 - Stock luajit finds `require "lust.<x>"` at `<cpath>/lust/<x>.so`, so
   module output names/dirs must keep that layout.
 - The Lua part of a library (`lib_lua`: every `ffi` library, optionally

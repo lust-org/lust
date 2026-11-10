@@ -32,6 +32,7 @@
 - Never raise while holding memory the GC doesn't own; most Lua API
   calls can raise. Hand it to a `__gc` userdata first, or return a
   status up the recursion, clean up, then raise or return `nil, err`.
+  The same calls may run finalizers: see `docs/gc-reentrancy.md`.
 - On `nil, err`, reset the stack (`lua_settop`); no partial results.
 - `ffi` C functions never raise: they return a status, the Lua part
   applies the rules above.

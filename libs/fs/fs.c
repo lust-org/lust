@@ -42,6 +42,7 @@
 
 #include "lust.h"
 #include "lust_errno.h"
+#include "lust_scratch.h"
 
 #ifndef LUST_LUA_BC_H
 #error "LUST_LUA_BC_H must be defined (by libs/lust/meson.build)"
@@ -79,19 +80,15 @@ static const char *const stat_keys[K_N] = {
 #define DIRBUF_SIZE 32768
 
 /*
- * Per Lua state (an upvalue of list), it owns what a list holds while
- * pushing names may raise a Lua error (out of memory): the directory's
- * descriptor, closed after the listing or by __gc. And the buffer for the
- * entries, allocated on the first list, kept until __gc.
- *
- * A call finding the State busy replaces it with a new one (see l_list):
- * it is either used by the call this one runs within (a __gc metamethod
- * run by an allocation of list called list again), or was left busy by a
- * call that raised.
+ * The scratch of list (include/lust_scratch.h), it owns what a list holds
+ * while pushing names may raise a Lua error (out of memory) or run a
+ * finalizer that lists, too: the directory's descriptor, closed after the
+ * listing or by __gc. And the buffer for the entries, allocated on the
+ * first list, kept until __gc.
  */
 typedef struct {
+  LustScratch scratch;
   int fd;     /* -1: none */
-  int busy;   /* a list is using it */
   char *buf;  /* DIRBUF_SIZE bytes, NULL until needed */
 } State;
 
@@ -212,10 +209,10 @@ static int l_state_gc(lua_State *L) {
 }
 
 /* Pushes a new State (with its __gc). */
-static State *push_state(lua_State *L) {
+static void *push_state(lua_State *L) {
   State *st = (State *)lua_newuserdata(L, sizeof *st);
+  st->scratch.busy = 0;
   st->fd = -1;
-  st->busy = 0;
   st->buf = NULL;
   if (luaL_newmetatable(L, STATE_MT)) {
     lua_pushcfunction(L, l_state_gc);
@@ -239,23 +236,16 @@ static int l_list(lua_State *L) {
   State *st;
 
   parse_opts(L, 2, list_opt, &types);
-  /* The State on the stack, too: a call this one runs (see State) may
-   * replace the upvalue, this one keeps using it. */
-  lua_pushvalue(L, lua_upvalueindex(1));
-  st = (State *)lua_touserdata(L, -1);
-  if (st->busy) {
-    /* A new one, for this call and the later ones. The old one is
-     * released by its __gc: once the call using it is done, or soon
-     * (that call raised, it is garbage now). */
-    st = push_state(L);
-    lua_pushvalue(L, -1);
-    lua_replace(L, lua_upvalueindex(1));
-  }
-  if (st->buf == NULL && (st->buf = (char *)malloc(DIRBUF_SIZE)) == NULL)
+  st = (State *)lust_scratch_acquire(L, lua_upvalueindex(1), push_state);
+  if (st->buf == NULL && (st->buf = (char *)malloc(DIRBUF_SIZE)) == NULL) {
+    lust_scratch_release(&st->scratch);
     return luaL_error(L, "not enough memory");
+  }
   st->fd = open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
-  if (st->fd < 0) return lust_push_errno(L, path, errno);
-  st->busy = 1;
+  if (st->fd < 0) {
+    lust_scratch_release(&st->scratch);
+    return lust_push_errno(L, path, errno);
+  }
 
   for (;;) {
     ssize_t len = getdents64(st->fd, st->buf, DIRBUF_SIZE), off;
@@ -289,7 +279,7 @@ static int l_list(lua_State *L) {
     }
   }
   state_close(st);
-  st->busy = 0;
+  lust_scratch_release(&st->scratch);
   if (e != 0) return lust_push_errno(L, path, e);
   if (names_idx == 0) { /* (no entries at all: a removed directory) */
     lua_newtable(L);
