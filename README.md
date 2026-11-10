@@ -23,11 +23,14 @@ print(xxh.xxh64("abc")) --> 44bc2cf5ad770999
 | `lust.xxh`  | xxHash              | `vendor/xxhash`, linked statically      |
 | `lust.pcre2` | PCRE2 (Perl compatible) regular expressions | `vendor/pcre2`, linked statically |
 | `lust.json` | JSON (2 to 4 times faster than lua-cjson, see `libs/json/vs-cjson.lua`) | `vendor/yyjson`, linked statically |
+| `lust.fs`   | file system: list, walk, stat, readlink, mkdir, temporary files | none (libc) |
 
 Libraries come in two kinds (`lib_kind` in their `meson.build`):
 
-- `capi`: classic Lua C API module (`lust.xxh`, `lust.pcre2`, `lust.json`).
-  The default, and cheapest to `require`.
+- `capi`: classic Lua C API module (`lust.xxh`, `lust.pcre2`, `lust.json`,
+  `lust.fs`). The default, and cheapest to `require`. It may have a Lua
+  part for what reads better in Lua, embedded as bytecode (`lust.fs`'s
+  `walkdir`).
 - `ffi`: [static FFI bindings](https://evo-lua.github.io/docs/background-information/luajit/static-ffi-bindings/).
   The C code is plain C that knows nothing about Lua and just exports
   functions. A Lua file binds them with `ffi.cdef`; it is compiled to
@@ -65,7 +68,7 @@ git clone <this repo> && cd lust
 (`meson setup build && meson compile -C build && meson test -C build`).
 Meson options (`./dev.py build -D name=value`, see `meson_options.txt`):
 
-- `libs=xxh,pcre2,json`: build only these libraries (default: all). This also
+- `libs=xxh,pcre2,json,fs`: build only these libraries (default: all). This also
   decides which libraries get linked into `lust`.
 - `lust=disabled`: don't build the `lust` binary (skips building LuaJIT).
 - `cmoddir=...`: where the `.so` files go (default `<libdir>/lua/5.1`).

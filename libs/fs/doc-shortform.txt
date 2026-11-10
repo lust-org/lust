@@ -1,0 +1,46 @@
+Conventions:
+  Failures (missing file, no permission, ...) return nil, "<path>: <reason>",
+  "<errno name>" (e.g. "ENOENT"). Wrong arguments or opts raise an error.
+  Types of files: "file", "directory", "link", "fifo", "socket", "char",
+  "block", "other"
+
+list(path [, opts]): {name, ...} [, {type, ...}] | nil, err, code
+  Names of the entries of directory path, without . and .., in no
+  particular order. opts: types (also return their types, as the directory
+  reports them: costs no stat)
+
+walkdir(root [, opts]): iterator, state | nil, err, code
+  for dir, name, type in walkdir(root) do: everything below root, depth
+  first, a directory before its contents (each in no particular order),
+  links are not followed. dir is the directory the entry is in (root as
+  given, or dir .. "/" .. name of a directory yielded before): join them
+  only where the path is needed, that is the costly part of a step. A
+  directory that cannot be listed raises an error (unless it vanished)
+  when the iterator gets to it. opts: max_depth (1: only the entries of
+  root), prune (function(path): true skips the contents of that
+  directory), on_error (function(path, err, code), called instead of
+  raising)
+
+stat(path [, opts [, t]]): t | nil, err, code
+  Fields: type, size, mode (permission bits, e.g. tonumber("755", 8)),
+  mtime, atime, ctime (seconds since the epoch, with fractions), uid, gid,
+  nlink, ino, dev. opts: follow (default true; false describes a link
+  itself). t: the table to set the fields in (all of them, other keys
+  are kept; left alone on failure), default a new one. Reusing one in a
+  loop halves the cost of a call
+
+readlink(path): str | nil, err, code
+  Target of the symbolic link path
+
+mkdir(path [, opts]): true | nil, err, code
+  Creates directory path. opts: mode (default 0777, minus the umask),
+  parents (create missing parents too; an existing directory is no error)
+
+tempfile([opts]): path | nil, err, code
+  Creates a new empty file only the user can access (mkstemp), open it
+  with io.open(path, "w+"). opts: dir (default $TMPDIR or /tmp), prefix
+  (default "lust-"), suffix
+
+tempdir([opts]): path | nil, err, code
+  Creates a new directory only the user can access (mkdtemp). opts: dir,
+  prefix as for tempfile

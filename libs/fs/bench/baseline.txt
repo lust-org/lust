@@ -1,0 +1,18 @@
+# User space instructions per run of each benchmark, checked by
+# tests/test_bench.py (see there). Regenerate after an intended change:
+#   ./dev.py test --suite bench --test-args=--update
+# <flavour> <benchmark> <instructions>
+luajit create.lua 2427985
+luajit list.lua 20087407
+luajit stat.lua 50596368
+luajit stat_into.lua 21182228
+luajit walkdir.lua 11245633
+luajit walkdir_depth.lua 8993590
+luajit walkdir_prune.lua 9800029
+lust create.lua 2352732
+lust list.lua 19716265
+lust stat.lua 51008474
+lust stat_into.lua 20919894
+lust walkdir.lua 11054831
+lust walkdir_depth.lua 8858717
+lust walkdir_prune.lua 9700163
