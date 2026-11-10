@@ -99,7 +99,9 @@ T.run {
   end,
 
   only_stdio_is_inherited = function()
-    local count = 'ls /proc/$$/fd | wc -l'
+    -- (ls's own descriptors: what it inherited, and the directory it
+    -- reads; the shell's ($$) would race with it setting up the pipe)
+    local count = 'ls /proc/self/fd | wc -l'
     local _, before = sh(count)
     local files = {}
     for i = 1, 3 do files[i] = assert(io.open("/dev/null")) end
