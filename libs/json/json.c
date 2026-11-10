@@ -49,6 +49,7 @@
 #include <string.h>
 
 #include "lust.h"
+#include "lust_scratch.h"
 #include "yyjson.h"
 
 /* Registry name of the metatable of the state (see State). */
@@ -61,12 +62,15 @@
 #define KEEP_BUF_MAX (1u << 20)
 
 /*
- * Per Lua state (the userdata is an upvalue of decode and encode), it owns
- * the resources an operation holds while it may raise a Lua error (out of
- * memory ...): nothing leaks, whatever happens. They are released after the operation, by the next call at the
- * latest, or by __gc.
+ * The scratch of decode and encode (include/lust_scratch.h, an upvalue of
+ * both), it owns what a call holds while it may raise a Lua error (out of
+ * memory) or run a finalizer that decodes or encodes, too: the document
+ * being decoded, freed after the call or by __gc. And the output buffer
+ * of encode, kept for the next call (unless it grew large), freed by
+ * __gc.
  */
 typedef struct {
+  LustScratch scratch;
   yyjson_doc *doc; /* the document being turned into Lua values */
   char *buf;       /* the output of encode ... */
   size_t len;      /* ... how much of it is used ... */
@@ -75,6 +79,26 @@ typedef struct {
 
 /* Address is the value of json.empty_array. */
 static char empty_array_tag;
+
+static int l_state_gc(lua_State *L) {
+  State *st = (State *)luaL_checkudata(L, 1, STATE_MT);
+  if (st->doc != NULL) yyjson_doc_free(st->doc);
+  free(st->buf);
+  memset(st, 0, sizeof *st);
+  return 0;
+}
+
+/* Pushes a new State (with its __gc). */
+static void *push_state(lua_State *L) {
+  State *st = (State *)lua_newuserdata(L, sizeof *st);
+  memset(st, 0, sizeof *st);
+  if (luaL_newmetatable(L, STATE_MT)) {
+    lua_pushcfunction(L, l_state_gc);
+    lua_setfield(L, -2, "__gc");
+  }
+  lua_setmetatable(L, -2);
+  return st;
+}
 
 static int bad_opt(lua_State *L, const char *key) {
   return luaL_argerror(L, 2, lua_pushfstring(L, "unknown option '%s'", key));
@@ -164,7 +188,7 @@ static int push_value(lua_State *L, const yyjson_val *v, int depth) {
 
 /* json.decode(str [, opts]) -> value | nil, err */
 static int l_decode(lua_State *L) {
-  State *st = (State *)lua_touserdata(L, lua_upvalueindex(1));
+  State *st;
   size_t len;
   const char *s = luaL_checklstring(L, 1, &len);
   yyjson_read_flag flg = YYJSON_READ_NOFLAG;
@@ -193,12 +217,6 @@ static int l_decode(lua_State *L) {
     }
   }
 
-  /* What an earlier call left behind when it raised an error. */
-  if (st->doc != NULL) {
-    yyjson_doc_free(st->doc);
-    st->doc = NULL;
-  }
-
   /* The text is copied (the reader needs a zero padded, writable copy
    * anyway), and `s` is not modified. */
   doc = yyjson_read_opts((char *)(uintptr_t)s, len, flg, NULL, &err);
@@ -211,11 +229,14 @@ static int l_decode(lua_State *L) {
     return 2;
   }
 
+  /* Owned by the scratch while pushing the values may raise or reenter */
+  st = (State *)lust_scratch_acquire(L, lua_upvalueindex(1), push_state);
   st->doc = doc;
   top = lua_gettop(L);
   ok = push_value(L, yyjson_doc_get_root(doc), max_depth);
   st->doc = NULL;
   yyjson_doc_free(doc);
+  lust_scratch_release(&st->scratch);
   if (!ok) {
     lua_settop(L, top);
     lua_pushnil(L);
@@ -235,7 +256,7 @@ typedef struct {
   int indent;     /* spaces per level, 0: compact */
   int nan_inf;    /* write NaN and Infinity instead of raising an error */
   int max_depth;
-  int array_mt;   /* stack index of json.array_mt */
+  int array_mt;   /* (pseudo) index of json.array_mt */
   /* Why the value cannot be encoded (a format with at most one %s, and
    * its argument): set by `fail`, reported by l_encode. */
   const char *err, *what;
@@ -582,11 +603,10 @@ static void trim_buf(State *st) {
 
 /* json.encode(value [, opts]) -> str | nil, err */
 static int l_encode(lua_State *L) {
-  State *st = (State *)lua_touserdata(L, lua_upvalueindex(1));
+  State *st;
   Enc e;
 
   e.L = L;
-  e.st = st;
   e.indent = 0;
   e.nan_inf = 0;
   e.max_depth = DEFAULT_MAX_DEPTH;
@@ -606,23 +626,28 @@ static int l_encode(lua_State *L) {
     }
   }
 
-  /* Arguments out of the way: json.array_mt (index 1), then the value to
-   * encode, which has to be on top of the stack for encode_value */
+  /* The value, the scratch, the value again: it has to be on top of the
+   * stack for encode_value. (json.array_mt is compared as the upvalue it
+   * is, encode_* are no functions of their own.) */
   lua_settop(L, 1);
-  lua_pushvalue(L, lua_upvalueindex(2));
-  lua_insert(L, 1);
-  e.array_mt = 1;
+  e.st = st = (State *)lust_scratch_acquire(L, lua_upvalueindex(1), push_state);
+  lua_pushvalue(L, 1);
+  e.array_mt = lua_upvalueindex(2);
 
   st->len = 0;
   if (!encode_value(&e, 0)) {
     trim_buf(st);
+    lust_scratch_release(&st->scratch);
     lua_settop(L, 0);
     lua_pushnil(L);
     lua_pushfstring(L, e.err, e.what);
     return 2;
   }
+  /* (the scratch stays busy: creating the string may reenter, before it
+   * copies the buffer) */
   lua_pushlstring(L, st->buf, st->len);
   trim_buf(st);
+  lust_scratch_release(&st->scratch);
   return 1;
 }
 
@@ -630,28 +655,12 @@ static int l_encode(lua_State *L) {
 /* module                                                              */
 /* ------------------------------------------------------------------ */
 
-static int l_state_gc(lua_State *L) {
-  State *st = (State *)luaL_checkudata(L, 1, STATE_MT);
-  if (st->doc != NULL) yyjson_doc_free(st->doc);
-  free(st->buf);
-  memset(st, 0, sizeof *st);
-  return 0;
-}
-
 LUST_API int luaopen_lust_json(lua_State *L) {
-  State *st;
-
   lua_settop(L, 0); /* (the module name) */
   lua_newtable(L);  /* the module, index 1 */
 
-  /* The state, shared (as an upvalue) by decode and encode */
-  st = (State *)lua_newuserdata(L, sizeof *st); /* 2 */
-  memset(st, 0, sizeof *st);
-  if (luaL_newmetatable(L, STATE_MT)) {
-    lua_pushcfunction(L, l_state_gc);
-    lua_setfield(L, -2, "__gc");
-  }
-  lua_setmetatable(L, -2);
+  /* The scratch, shared (as an upvalue) by decode and encode */
+  push_state(L); /* 2 */
 
   lua_newtable(L); /* array_mt, 3 */
   lua_pushvalue(L, -1);

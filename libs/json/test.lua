@@ -285,4 +285,44 @@ T.run {
     end
     collectgarbage()
   end,
+
+  -- A finalizer run by an allocation of decode/encode decodes and encodes,
+  -- too: neither call may disturb the other.
+  decode_during_gc = function()
+    local big = {}
+    for i = 1, 5000 do big[i] = { a = "x" .. i, b = { i, i + 0.5 } } end
+    local text = assert(json.encode(big))
+    local n = T.during_gc(function()
+      for _ = 1, 20 do
+        local v = assert(json.decode(text))
+        T.eq(#v, 5000)
+        T.eq(v[5000].a, "x5000")
+        T.eq(v[4999].b[2], 4999.5)
+      end
+    end, function()
+      T.eq(json.decode('{"k":[1,2,3]}').k[3], 3)
+      T.eq(json.encode({ "inner" }), '["inner"]')
+    end)
+    assert(n > 0, "no finalizer ran")
+  end,
+
+  encode_during_gc = function()
+    -- The loop allocates nothing but encode's results, so the finalizer
+    -- runs inside encode (where creating the result runs the collector).
+    -- Results differ (an equal string would be interned, not created).
+    local s = ("y"):rep(100000)
+    local v = { s, 0 }
+    local n = T.during_gc(function()
+      for i = 1, 200 do
+        v[2] = i
+        local r = json.encode(v)
+        T.eq(#r, #s + 5 + (i < 10 and 1 or i < 100 and 2 or 3), "length")
+        T.eq(r:byte(3), 121, "outer encode")
+      end
+    end, function()
+      T.eq(json.encode({ "inner" }), '["inner"]')
+      T.eq(json.decode('[1]')[1], 1)
+    end)
+    assert(n > 0, "no finalizer ran")
+  end,
 }

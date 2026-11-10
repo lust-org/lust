@@ -30,9 +30,10 @@ typedef struct {
 } LustScratch;
 
 /*
- * Pushes the scratch of upvalue `uv`, marked busy, and returns it. If it
- * is busy, push_new pushes a new one (with busy 0, its other fields
- * initialized), which replaces the upvalue and is returned instead.
+ * Pushes the scratch of upvalue `uv` (one value, in any case), marked
+ * busy, and returns it. If it is busy, push_new pushes a new one (with
+ * busy 0, its other fields initialized), which replaces the upvalue and
+ * is pushed and returned instead.
  */
 static inline void *lust_scratch_acquire(lua_State *L, int uv,
                                          void *(*push_new)(lua_State *L)) {
@@ -43,6 +44,7 @@ static inline void *lust_scratch_acquire(lua_State *L, int uv,
     s = (LustScratch *)push_new(L);
     lua_pushvalue(L, -1);
     lua_replace(L, uv);
+    lua_replace(L, -2); /* (the old one stays on the stack of its call) */
   }
   s->busy = 1;
   return s;
