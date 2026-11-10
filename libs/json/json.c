@@ -487,8 +487,11 @@ static int encode_table(Enc *e, int level) {
   lua_pushnil(L);
   if (!lua_next(L, t)) {
     /* An empty table: an object, unless it is marked as array */
-    int arr = lua_getmetatable(L, t) && lua_rawequal(L, -1, e->array_mt);
-    if (arr) lua_pop(L, 1);
+    int arr = 0;
+    if (lua_getmetatable(L, t)) {
+      arr = lua_rawequal(L, -1, e->array_mt);
+      lua_pop(L, 1); /* (any metatable: the callers pop the value next) */
+    }
     put(e, arr ? "[]" : "{}", 2);
     return 1;
   }

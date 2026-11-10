@@ -177,6 +177,13 @@ T.run {
     T.eq(json.encode({ a = json.empty_array, b = setmetatable({}, json.array_mt) }):gsub('"%a"', ""), "{:[],:[]}")
     T.eq(json.encode(setmetatable({ 1, 2 }, json.array_mt)), "[1,2]")
     T.eq(json.encode(setmetatable({}, {})), "{}") -- some other metatable
+    -- ... nested: must not disturb the iteration of the outer table
+    local mt = {}
+    T.eq(json.encode({ setmetatable({}, mt), setmetatable({}, mt), 1 }), "[{},{},1]")
+    local s = assert(json.encode({ a = setmetatable({}, mt), b = 1, c = 2, d = 3 }))
+    T.eq(#s, #'{"a":{},"b":1,"c":2,"d":3}')
+    T.eq(json.decode(s).a.b, nil)
+    T.eq(json.decode(s).d, 3)
   end,
 
   encode_ignores_metamethods = function()
