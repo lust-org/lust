@@ -1,0 +1,4 @@
+monotonic(): number
+  Seconds (with nanosecond fractions) since an arbitrary point, steadily
+  increasing: unlike os.time() it does not jump when the clock is set,
+  unlike os.clock() it is not CPU time. For measuring elapsed time

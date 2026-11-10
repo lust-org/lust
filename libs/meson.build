@@ -45,6 +45,7 @@ all_libs = [
   'pcre2',
   'json',
   'fs',
+  'sys.time',
 ]
 
 requested = get_option('libs')
