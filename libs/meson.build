@@ -50,6 +50,7 @@ all_libs = [
   'sys.env',
   'sys.term',
   'sys.signal',
+  'sys.proc',
 ]
 
 requested = get_option('libs')

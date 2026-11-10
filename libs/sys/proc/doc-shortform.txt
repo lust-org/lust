@@ -1,0 +1,10 @@
+run(argv [, opts]): status, stdout, stderr | nil, err, code
+  Runs program argv[1] with the arguments argv[2], ... (no shell; found
+  in PATH unless it contains "/"), waits for it to exit. status: its exit
+  code, or the name of the signal that killed it ("SIGKILL"). stdout,
+  stderr: its output (nil unless captured). Fails (nil, err, code) only
+  if it cannot be started ("ENOENT": not found). It gets no descriptors
+  but 0, 1, 2. opts: input (a string fed to its stdin, default: it
+  inherits ours), stdout, stderr ("capture" (default), "inherit" or
+  "null"), cwd, env (variables to set (name = value) or remove (name =
+  false), in a copy of ours)
