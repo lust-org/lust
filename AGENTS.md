@@ -57,10 +57,10 @@ when its topic comes up; new project-wide conventions go there too.
 - Requiring one library must not load any other (`tests/test_lazy.lua`).
 - Stock luajit finds `require "lust.<x>"` at `<cpath>/lust/<x>.so`, so
   module output names/dirs must keep that layout.
-- The Lua part of an `ffi` library must not use table constructors with
-  named fields: LuaJIT dumps them in a per process randomized order, so
-  the embedded bytecode would not be reproducible
-  (`tests/test_bytecode.py`).
+- The Lua part of a library (`lib_lua`: every `ffi` library, optionally
+  a `capi` one) must not use table constructors with named fields:
+  LuaJIT dumps them in a per process randomized order, so the embedded
+  bytecode would not be reproducible (`tests/test_bytecode.py`).
 - Do not modify the vendored LuaJIT tree. `tools/build-luajit.py` mirrors
   it into the build dir and builds there.
 - Install locations must work on Arch and Ubuntu: use meson's `libdir`

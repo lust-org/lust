@@ -11,10 +11,11 @@ foreach name, info : lib_infos
   sources = info['sources']
   c_args = []
 
-  if info['kind'] == 'ffi'
+  if info['lua'].length() > 0
     # The Lua part is compiled to (stripped, hence reproducible) bytecode by
-    # the LuaJIT built from vendor/luajit, and embedded by ffi_shim.c, which
-    # provides the luaopen function. See ffi_shim.c for the details.
+    # the LuaJIT built from vendor/luajit and embedded: for 'ffi' by
+    # ffi_shim.c, which provides the luaopen function (see there for the
+    # details), for 'capi' by the library's own C code.
     bytecode = custom_target(
       name + '_bc',
       input: info['lua'],
@@ -24,11 +25,16 @@ foreach name, info : lib_infos
       # interpreter finds through this.
       env: {'LUA_PATH': luajit_src / 'src' / '?.lua'},
     )
-    sources += [files('../ffi_shim.c'), bytecode]
+    sources += bytecode
+  endif
+  if info['kind'] == 'ffi'
+    sources += files('../ffi_shim.c')
     c_args += [
       '-DLUST_FFI_NAME=' + name,
       '-DLUST_FFI_BC_H="@0@_bc.h"'.format(name),
     ]
+  elif info['lua'].length() > 0
+    c_args += '-DLUST_LUA_BC_H="@0@_bc.h"'.format(name)
   endif
 
   mod = shared_module(

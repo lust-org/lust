@@ -160,22 +160,21 @@ foreach name : enabled_libs
   )
 endforeach
 
-# The embedded bytecode of `ffi` libraries has to be reproducible.
-ffi_luas = []
+# The embedded bytecode of the Lua parts of libraries (all of `ffi` ones,
+# optional for `capi` ones) has to be reproducible.
+lib_luas = []
 foreach name, info : lib_infos
-  if info['kind'] == 'ffi'
-    ffi_luas += info['lua']
-  endif
+  lib_luas += info['lua']
 endforeach
-if ffi_luas.length() > 0
+if lib_luas.length() > 0
   test(
-    'ffi bytecode is reproducible',
+    'embedded bytecode is reproducible',
     py,
     args: [
       files('test_bytecode.py'),
       luajit_exe,
       luajit_src / 'src',
-      ffi_luas,
+      lib_luas,
     ],
     suite: ['bytecode'],
   )

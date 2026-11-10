@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Guard the reproducibility of the embedded bytecode of `ffi` libraries.
+"""Guard the reproducibility of the embedded bytecode of libraries.
 
 usage: test_bytecode.py <luajit> <LuaJIT source dir> <lua file>...
 
-The Lua part of an `ffi` library is compiled to bytecode at build time and
-embedded (libs/ffi_shim.c). LuaJIT randomizes its string hashes per process,
+The Lua part of a library (every `ffi` one, optionally a `capi` one) is
+compiled to bytecode at build time and embedded (libs/ffi_shim.c). LuaJIT randomizes its string hashes per process,
 and a table constructor with named fields (`{ a = f(), b = 1 }`, or one with
 only constant keys) is dumped as a template laid out by those hashes: the
 bytecode, and with it the library and `lust`, would differ from build to

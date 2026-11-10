@@ -13,6 +13,12 @@
 #          bytecode and embedded, and only loaded on `require` (see
 #          libs/ffi_shim.c; no library uses it at the moment).
 #
+#      A 'capi' library may have a Lua part, too (`lib_lua`, for code that
+#      is better written in Lua): it is compiled to bytecode the same way
+#      and the C code gets it as LUST_LUA_BC_H to #include, which defines
+#      luaJIT_BC_lust_<name>[] and luaJIT_BC_lust_<name>_SIZE; the C code
+#      decides when to load it (see libs/fs/fs.c: lazily, on first use).
+#
 #      Every library also MUST have a doc-shortform.txt: its API as
 #      succinct as possible, which becomes part of `lust`'s help text
 #      (format: see tools/gen-help.py). tests/test_doc.lua checks that it
@@ -52,14 +58,14 @@ foreach name : enabled_libs
   lib_sources = [] # C sources of the library
   lib_deps = [] # its dependencies (dynamic system ones or vendored static)
   lib_kind = 'capi' # or 'ffi'
-  lib_lua = [] # 'ffi' only: the Lua file binding the C functions
+  lib_lua = [] # 'ffi': the Lua file binding the C functions, 'capi': optional Lua part
   lib_embed = true # link into `lust`
   subdir(name)
   if lib_kind not in ['capi', 'ffi']
     error('@0@: lib_kind must be "capi" or "ffi"'.format(name))
   endif
-  if (lib_kind == 'ffi') != (lib_lua.length() > 0)
-    error('@0@: lib_lua is required for (and only for) "ffi" libraries'.format(name))
+  if lib_kind == 'ffi' and lib_lua.length() == 0
+    error('@0@: lib_lua is required for "ffi" libraries'.format(name))
   endif
   lib_infos += {
     name: {
