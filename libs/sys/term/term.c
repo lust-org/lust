@@ -39,6 +39,7 @@ static int l_size(lua_State *L) {
   if (ioctl(fd, TIOCGWINSZ, &ws) != 0) {
     int e = errno, c;
     const char *rest = lust_strerror(e, &c);
+    lua_pushnil(L);
     lua_pushfstring(L, "fd %d: %c%s", fd, c, rest);
     return lust_errno_result(L, e);
   }

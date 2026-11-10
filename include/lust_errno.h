@@ -26,6 +26,7 @@
  * the result the rest. For messages lust_push_errno can't build in one go:
  *
  *   rest = lust_strerror(e, &c);
+ *   lua_pushnil(L);
  *   lua_pushfstring(L, "fd %d: %c%s", fd, c, rest);
  *   return lust_errno_result(L, e);
  */
@@ -36,13 +37,14 @@ static inline const char *lust_strerror(int e, int *c) {
   return msg[0] ? msg + 1 : "";
 }
 
-/* The message on top of the stack becomes nil, message, "<errno name>". */
+/*
+ * With nil and the message on top of the stack (pushed in this order, so
+ * nothing has to be moved), pushes "<errno name>" and returns 3.
+ */
 static inline int lust_errno_result(lua_State *L, int e) {
   const char *name = strerrorname_np(e);
   if (name != NULL) lua_pushstring(L, name);
   else lua_pushfstring(L, "E%d", e); /* (not known to this libc) */
-  lua_pushnil(L);
-  lua_insert(L, -3);
   return 3;
 }
 
@@ -54,6 +56,7 @@ static inline int lust_errno_result(lua_State *L, int e) {
 static inline int lust_push_errno(lua_State *L, const char *what, int e) {
   int c;
   const char *rest = lust_strerror(e, &c);
+  lua_pushnil(L);
   lua_pushfstring(L, "%s: %c%s", what, c, rest);
   return lust_errno_result(L, e);
 }

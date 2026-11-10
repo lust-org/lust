@@ -450,6 +450,7 @@ static int l_run(lua_State *L) {
     if (o.cwd) {
       int c;
       const char *rest = lust_strerror(e, &c);
+      lua_pushnil(L);
       lua_pushfstring(L, "%s (in %s): %c%s", argv[0], o.cwd, c, rest);
       return lust_errno_result(L, e);
     }
