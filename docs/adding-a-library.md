@@ -16,7 +16,8 @@
      exports. The build fails without it,
    - `bench/*.lua`: benchmarks of what the library provides, and their
      `bench/baseline.txt` (see [Benchmark regressions](benchmark-regressions.md)),
-   - optionally `examples/<name>.lua`.
+   - optionally `examples/<name>.lua` (for a namespace: one
+     `examples/<ns>.lua` for all of its libraries, e.g. `examples/sys.lua`).
    - a library with a dynamic dependency: write it as `ffi` with
      `ffi.load()`, or set `lib_embed = false` (`.so` only, loaded by
      `lust` on demand). `tests/test_startup.py` guards `lust`'s startup.

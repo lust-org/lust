@@ -24,11 +24,21 @@ print(xxh.xxh64("abc")) --> 44bc2cf5ad770999
 | `lust.pcre2` | PCRE2 (Perl compatible) regular expressions | `vendor/pcre2`, linked statically |
 | `lust.json` | JSON (2 to 4 times faster than lua-cjson, see `libs/json/vs-cjson.lua`) | `vendor/yyjson`, linked statically |
 | `lust.fs`   | file system: list, walk, stat, readlink, mkdir, temporary files | none (libc) |
+| `lust.sys.proc` | run programs without a shell, capture their output | none (libc) |
+| `lust.sys.env` | set and unset environment variables | none (libc) |
+| `lust.sys.time` | monotonic clock | none (libc) |
+| `lust.sys.random` | cryptographically secure random bytes | none (libc) |
+| `lust.sys.term` | terminal detection and size | none (libc) |
+| `lust.sys.signal` | Lua callbacks for signals | none (libc) |
+
+A library can be in a namespace: `lust.sys.proc` is a library of its own
+(`lust/sys/proc.so`), `sys` only groups it with the others, there is no
+`lust.sys` to require.
 
 Libraries come in two kinds (`lib_kind` in their `meson.build`):
 
-- `capi`: classic Lua C API module (`lust.xxh`, `lust.pcre2`, `lust.json`,
-  `lust.fs`). The default, and cheapest to `require`. It may have a Lua
+- `capi`: classic Lua C API module (all libraries at the moment). The
+  default, and cheapest to `require`. It may have a Lua
   part for what reads better in Lua, embedded as bytecode (`lust.fs`'s
   `walkdir`).
 - `ffi`: [static FFI bindings](https://evo-lua.github.io/docs/background-information/luajit/static-ffi-bindings/).
@@ -87,6 +97,7 @@ build/src/lust -e 'print(require("lust.xxh").xxh64("abc"))'
 ```sh
 build/src/lust examples/xxh.lua
 build/src/lust examples/pcre2.lua
+build/src/lust examples/sys.lua    # all of lust.sys.*
 ```
 
 ## Installing
@@ -105,6 +116,7 @@ sudo/pkexec).
 | ---------------------------- | --------------------------------------- |
 | `lust`                       | `<prefix>/bin/lust`                     |
 | `lust/<name>.so`             | `<libdir>/lua/5.1/lust/<name>.so`       |
+| `lust/<ns>/<name>.so`        | `<libdir>/lua/5.1/lust/<ns>/<name>.so`  |
 | `jit.*` Lua modules (`-jv`…) | `<prefix>/share/lust/jit/`              |
 
 `<libdir>` is picked by meson for the distribution: `lib` on Arch,
@@ -121,11 +133,12 @@ meson.build         project, ties everything together
 meson_options.txt
 include/lust.h      header shared by all libraries
 libs/<name>/        one directory per library: <name>.c, test.lua, meson.build
+libs/<ns>/<name>/   the same for library <ns>.<name> (libs/sys/proc/: lust.sys.proc)
 libs/<name>/bench/  its benchmarks + their baseline.txt (instruction counts)
 libs/ffi_shim.c     loads the embedded bytecode of the `ffi` libraries
 libs/lust/          defines the build targets of all libraries
 src/                the `lust` binary (lust.c + build of LuaJIT)
-examples/           runnable examples, one per library
+examples/           runnable examples, one per library (or namespace)
 docs/               conventions and how-tos for working on lust
 tools/              helper used by the meson build
 tools/absl-sources.py  checks the Abseil source list of vendor/meson.build
