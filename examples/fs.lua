@@ -1,5 +1,6 @@
--- lust.sys.fs: list, walk and inspect directories, create directories and
--- temporary files, resolve paths, check and change permissions.
+-- lust.sys.fs: read and write files, list, walk and inspect directories,
+-- create directories and temporary files, resolve paths, check and change
+-- permissions.
 --
 --   build/src/lust examples/fs.lua
 
@@ -9,8 +10,16 @@ local fs = require "lust.sys.fs"
 local root = assert(fs.tempdir { prefix = "fs-example-" })
 assert(fs.mkdir(root .. "/src/lib", { parents = true }))
 for _, name in ipairs { "src/main.lua", "src/lib/util.lua", "README" } do
-  assert(io.open(root .. "/" .. name, "w")):close()
+  assert(fs.write(root .. "/" .. name, "-- " .. name .. "\n"))
 end
+
+-- Whole files: read, write, append; atomic replaces the file in one step
+-- (a reader or a crash never sees half of it).
+local readme = root .. "/README"
+assert(fs.write(readme, "more\n", { append = true }))
+io.write("read ", fs.read(readme)) --> "-- README\nmore\n"
+assert(fs.write(root .. "/config.json", '{"answer": 42}\n', { atomic = true }))
+print("read", fs.read(root .. "/missing")) --> nil  .../missing: no such file or directory  ENOENT
 
 -- The entries of one directory, with their types (no stat needed).
 local names, types = assert(fs.list(root, { types = true }))
@@ -34,9 +43,7 @@ end
 
 -- A temporary file only we can access, to be opened by name.
 local tmp = assert(fs.tempfile { dir = root, suffix = ".txt" })
-local f = assert(io.open(tmp, "w"))
-f:write("hello\n")
-f:close()
+assert(fs.write(tmp, "hello\n"))
 print("tempfile", tmp:sub(#root + 2), fs.stat(tmp).size)
 
 print("readlink", fs.readlink("/proc/self/exe"))
@@ -47,7 +54,7 @@ print("realpath", fs.realpath(root .. "/src/lib/../main.lua"):sub(-12))
 
 -- Make a script executable.
 local script = root .. "/run.sh"
-assert(io.open(script, "w")):close()
+assert(fs.write(script, "#!/bin/sh\necho hi\n"))
 assert(fs.chmod(script, tonumber("755", 8)))
 print("chmod", string.format("%o", fs.stat(script).mode)) --> 755
 

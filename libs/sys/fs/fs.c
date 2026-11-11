@@ -2,6 +2,8 @@
  * lust.sys.fs: file system basics the Lua standard library lacks.
  *
  *   local fs = require "lust.sys.fs"
+ *   fs.read("a.txt")                  --> "hello\n"
+ *   fs.write("a.txt", "hi\n", { atomic = true })
  *   fs.list("src")                    --> { "a.c", "b.c", ... }
  *   fs.list("src", { types = true })  --> { "a.c", ... }, { "file", ... }
  *   fs.stat("a.c")                    --> { type = "file", size = 12, ... }
@@ -41,6 +43,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/random.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -84,20 +87,26 @@ static const char *const stat_keys[K_N] = {
 #define STAT_KEY_UV(k) lua_upvalueindex(1 + TY_N + (k))
 
 /* Size of the buffer list reads directory entries into (as glibc's
- * opendir, which allocates one per call; ours is kept). */
-#define DIRBUF_SIZE 32768
+ * opendir, which allocates one per call; ours is kept) and read reads
+ * files that fit into. */
+#define BUF_SIZE 32768
+
+/* The name of the temporary file an atomic write renames over its path:
+ * TMP_PREFIX and TMP_RANDOM random characters, in the same directory. */
+#define TMP_PREFIX ".lust-"
+#define TMP_RANDOM 8
 
 /*
- * The scratch of list (include/lust_scratch.h), it owns what a list holds
- * while pushing names may raise a Lua error (out of memory) or run a
- * finalizer that lists, too: the directory's descriptor, closed after the
- * listing or by __gc. And the buffer for the entries, allocated on the
- * first list, kept until __gc.
+ * The scratch of list and read (include/lust_scratch.h), it owns what
+ * they hold while pushing names or allocating may raise a Lua error (out
+ * of memory) or run a finalizer that lists or reads, too: the
+ * descriptor, closed when done or by __gc. And the buffer for directory
+ * entries or file contents, allocated on first use, kept until __gc.
  */
 typedef struct {
   LustScratch scratch;
   int fd;     /* -1: none */
-  char *buf;  /* DIRBUF_SIZE bytes, NULL until needed */
+  char *buf;  /* BUF_SIZE bytes, NULL until needed */
 } State;
 
 /* ------------------------------------------------------------------ */
@@ -245,7 +254,7 @@ static int l_list(lua_State *L) {
 
   parse_opts(L, 2, list_opt, &types);
   st = (State *)lust_scratch_acquire(L, lua_upvalueindex(1), push_state);
-  if (st->buf == NULL && (st->buf = (char *)malloc(DIRBUF_SIZE)) == NULL) {
+  if (st->buf == NULL && (st->buf = (char *)malloc(BUF_SIZE)) == NULL) {
     lust_scratch_release(&st->scratch);
     return luaL_error(L, "not enough memory");
   }
@@ -257,7 +266,7 @@ static int l_list(lua_State *L) {
 
   for (;;) {
     /* (void *: musl declares it with a struct dirent *) */
-    ssize_t len = getdents64(st->fd, (void *)st->buf, DIRBUF_SIZE), off;
+    ssize_t len = getdents64(st->fd, (void *)st->buf, BUF_SIZE), off;
     if (len <= 0) {
       if (len < 0) e = errno;
       break;
@@ -353,6 +362,189 @@ static int l_stat(lua_State *L) {
   /* (exact below 2^53, which is plenty for real file systems) */
   set_num(L, K_INO, (lua_Number)sb.st_ino);
   set_num(L, K_DEV, (lua_Number)sb.st_dev);
+  return 1;
+}
+
+/* ------------------------------------------------------------------ */
+/* read, write                                                         */
+/* ------------------------------------------------------------------ */
+
+/*
+ * fs.read(path) -> contents | nil, err, code
+ *
+ * A file smaller than the State's buffer (or of unknown size: fstat
+ * reports 0 for /proc files, pipes, ...) is read into that, a larger one
+ * into a userdata of its size + 1 (filling the + 1 means the file grew).
+ * A buffer that fills up is replaced by one twice as large. Then one copy
+ * into the string. The State owns the descriptor while allocating may
+ * raise.
+ */
+static int l_read(lua_State *L) {
+  const char *path = check_path(L, 1);
+  size_t cap = BUF_SIZE, len = 0;
+  struct stat sb;
+  State *st;
+  char *buf;
+  int e = 0;
+
+  lua_settop(L, 1);
+  st = (State *)lust_scratch_acquire(L, lua_upvalueindex(1), push_state); /* 2 */
+  st->fd = open(path, O_RDONLY | O_CLOEXEC);
+  if (st->fd < 0) {
+    lust_scratch_release(&st->scratch);
+    return lust_push_errno(L, path, errno);
+  }
+  if (fstat(st->fd, &sb) == 0 && S_ISREG(sb.st_mode) && sb.st_size >= BUF_SIZE)
+    cap = (size_t)sb.st_size + 1;
+  if (cap > BUF_SIZE) {
+    buf = (char *)lua_newuserdata(L, cap); /* 3 */
+  } else {
+    if (st->buf == NULL && (st->buf = (char *)malloc(BUF_SIZE)) == NULL) {
+      state_close(st);
+      lust_scratch_release(&st->scratch);
+      return luaL_error(L, "not enough memory");
+    }
+    buf = st->buf;
+  }
+
+  for (;;) {
+    ssize_t n;
+    if (len == cap) { /* full: continue in a larger copy, at index 3 */
+      char *larger = (char *)lua_newuserdata(L, cap * 2);
+      memcpy(larger, buf, len);
+      if (buf != st->buf) lua_replace(L, 3); /* (drops the old one) */
+      buf = larger;
+      cap *= 2;
+    }
+    n = read(st->fd, buf + len, cap - len);
+    if (n > 0) {
+      len += (size_t)n;
+    } else if (n == 0) {
+      break;
+    } else if (errno != EINTR) {
+      e = errno; /* (EISDIR for a directory) */
+      break;
+    }
+  }
+  state_close(st);
+  if (e != 0) {
+    lust_scratch_release(&st->scratch);
+    return lust_push_errno(L, path, e);
+  }
+  /* (copied before the release: once released, a finalizer run by this
+   * allocation could read into st->buf) */
+  lua_pushlstring(L, buf, len);
+  lust_scratch_release(&st->scratch);
+  return 1;
+}
+
+typedef struct {
+  int append, atomic;
+} WriteOpts;
+
+static void write_opt(lua_State *L, int arg, const char *key, void *ud) {
+  WriteOpts *o = (WriteOpts *)ud;
+  if (strcmp(key, "append") == 0) o->append = lua_toboolean(L, -1);
+  else if (strcmp(key, "atomic") == 0) o->atomic = lua_toboolean(L, -1);
+  else bad_opt(L, arg, key);
+}
+
+/* Writes all n bytes of s to fd. Returns 0 or an errno. */
+static int write_all(int fd, const char *s, size_t n) {
+  while (n > 0) {
+    ssize_t w = write(fd, s, n);
+    if (w < 0) {
+      if (errno == EINTR) continue;
+      return errno;
+    }
+    s += w;
+    n -= (size_t)w;
+  }
+  return 0;
+}
+
+/* Closes fd. Returns e, or if that is 0 the errno of a failed close
+ * (some file systems, NFS, report a failed write only there). */
+static int close_with(int fd, int e) {
+  if (close(fd) != 0 && e == 0 && errno != EINTR) e = errno;
+  return e;
+}
+
+/*
+ * The atomic write: writes the data to a new file in the directory of
+ * path, flushes it to the disk and renames it over path. rename replaces
+ * path in one step, so readers (and the file system after a crash) see
+ * the old contents or the new ones, never a part. Returns 0 or an errno.
+ *
+ * The new file gets the mode of the file it replaces, or 0666 minus the
+ * umask (as open applies it) for a new one. A path that is a symbolic
+ * link stays one: the file it points to is replaced. Everything is on the
+ * C stack and nothing runs a GC step: no Lua API calls in here.
+ */
+static int write_atomic(const char *path, const char *data, size_t len) {
+  static const char chars[] =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  char real[PATH_MAX], tmp[PATH_MAX], *rnd;
+  const char *target = path, *slash;
+  struct stat sb;
+  size_t dl;
+  int fd = -1, e, exists, tries, i;
+
+  /* (rename would replace the link itself) */
+  if (lstat(path, &sb) == 0 && S_ISLNK(sb.st_mode)) {
+    if (realpath(path, real) == NULL) return errno;
+    target = real;
+  }
+  exists = stat(target, &sb) == 0;
+
+  /* tmp: the directory part of target (with its "/"), the name */
+  slash = strrchr(target, '/');
+  dl = slash == NULL ? 0 : (size_t)(slash - target) + 1;
+  if (dl + sizeof TMP_PREFIX - 1 + TMP_RANDOM >= PATH_MAX) return ENAMETOOLONG;
+  memcpy(tmp, target, dl);
+  memcpy(tmp + dl, TMP_PREFIX, sizeof TMP_PREFIX - 1);
+  rnd = tmp + dl + sizeof TMP_PREFIX - 1;
+  rnd[TMP_RANDOM] = '\0';
+  /* O_EXCL: a name nobody else has, not even as a link to elsewhere */
+  for (tries = 0; tries < 100; tries++) {
+    unsigned char r[TMP_RANDOM];
+    /* (should getrandom fail, any name will do: O_EXCL decides) */
+    if (getrandom(r, sizeof r, GRND_NONBLOCK) != (ssize_t)sizeof r)
+      memset(r, tries, sizeof r);
+    for (i = 0; i < TMP_RANDOM; i++) rnd[i] = chars[r[i] % (sizeof chars - 1)];
+    fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0666);
+    if (fd >= 0 || errno != EEXIST) break;
+  }
+  if (fd < 0) return errno;
+
+  e = exists && fchmod(fd, sb.st_mode & 07777) != 0 ? errno : 0;
+  if (e == 0) e = write_all(fd, data, len);
+  if (e == 0 && fsync(fd) != 0) e = errno;
+  e = close_with(fd, e);
+  if (e == 0 && rename(tmp, target) != 0) e = errno;
+  if (e != 0) unlink(tmp);
+  return e;
+}
+
+/* fs.write(path, data [, opts]) -> true | nil, err, code */
+static int l_write(lua_State *L) {
+  const char *path = check_path(L, 1);
+  size_t len;
+  const char *data = luaL_checklstring(L, 2, &len);
+  WriteOpts o = {0, 0};
+  int fd, e;
+
+  parse_opts(L, 3, write_opt, &o);
+  if (o.append && o.atomic) luaL_argerror(L, 3, "append and atomic exclude each other");
+  if (o.atomic) {
+    e = write_atomic(path, data, len);
+  } else {
+    fd = open(path, O_WRONLY | O_CREAT | O_CLOEXEC | (o.append ? O_APPEND : O_TRUNC), 0666);
+    if (fd < 0) return lust_push_errno(L, path, errno);
+    e = close_with(fd, write_all(fd, data, len));
+  }
+  if (e != 0) return lust_push_errno(L, path, e);
+  lua_pushboolean(L, 1);
   return 1;
 }
 
@@ -705,6 +897,7 @@ static const luaL_Reg funcs[] = {
     {"mkdir", l_mkdir},
     {"tempfile", l_tempfile},
     {"tempdir", l_tempdir},
+    {"write", l_write},
     {NULL, NULL},
 };
 
@@ -721,7 +914,7 @@ LUST_API int luaopen_lust_sys_fs(lua_State *L) {
    * slots: LuaJIT grows its stack on every push anyway, PUC Lua 5.1 would
    * write past its end. */
   luaL_checkstack(L, 1 + 2 * (TY_N + K_N), NULL);
-  lua_createtable(L, 0, 10);
+  lua_createtable(L, 0, 12);
   luaL_register(L, NULL, funcs);
   for (i = 0; i < TY_N; i++) lua_pushstring(L, type_names[i]);
   for (i = 0; i < K_N; i++) lua_pushstring(L, stat_keys[i]);
@@ -731,8 +924,13 @@ LUST_API int luaopen_lust_sys_fs(lua_State *L) {
   lua_pushcclosure(L, l_stat, TY_N + K_N);
   lua_setfield(L, MOD_IDX, "stat");
 
-  /* list: its State and the type names as upvalues */
+  /* read: the State it shares with list as its upvalue */
   push_state(L);
+  lua_pushvalue(L, -1);
+  lua_pushcclosure(L, l_read, 1);
+  lua_setfield(L, MOD_IDX, "read");
+
+  /* list: the State and the type names as upvalues */
   for (i = 0; i < TY_N; i++) lua_pushvalue(L, TYPES_IDX + i);
   lua_pushcclosure(L, l_list, 1 + TY_N);
   lua_pushvalue(L, -1);

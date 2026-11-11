@@ -5,6 +5,15 @@ Conventions:
   "fifo", "socket", "char", "block", "other". A mode: permission bits,
   e.g. tonumber("755", 8)
 
+read(path): str
+  Contents of file path
+
+write(path, str [, opts]): true
+  Writes str to file path, created (mode 0666 minus the umask) or
+  emptied. opts: append (add to its end instead), atomic (readers, and a
+  crash, see the old or the new contents, never a part: writes a new file
+  next to it, renamed over path; it keeps path's mode, a link stays)
+
 list(path [, opts]): {name, ...} [, {type, ...}]
   Entries of directory path, without . and .., unordered. opts: types
   (also return their types, as the directory reports them: no stat)

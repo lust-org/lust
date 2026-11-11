@@ -351,6 +351,119 @@ T.run {
     fails("ENAMETOOLONG", "...: " .. toolong, fs.tempfile { dir = dir_of(4096) })
   end),
 
+  read_write = in_tmp(function(dir)
+    local f = dir .. "/f"
+    T.eq(fs.write(f, "hello\n"), true)
+    T.eq(fs.read(f), "hello\n")
+    T.eq(fs.write(f, "a\0b"), true, "emptied first")
+    T.eq(fs.read(f), "a\0b")
+    T.eq(fs.write(f, "c", { append = true }), true)
+    T.eq(fs.write(f, 42, { append = true }), true, "a number")
+    T.eq(fs.read(f), "a\0bc42")
+    T.eq(fs.write(f, ""), true)
+    T.eq(fs.read(f), "")
+    local plain = fs.stat(f).mode
+    T.eq(fs.write(dir .. "/g", "x", { append = true }), true, "append creates it")
+    T.eq(fs.read(dir .. "/g"), "x")
+    -- created with 0666 minus the umask, like io.open does
+    touch(dir .. "/io")
+    T.eq(plain, fs.stat(dir .. "/io").mode, "mode")
+  end),
+
+  read_sizes = in_tmp(function(dir)
+    -- around the size of the State's buffer (32768), and larger
+    for _, n in ipairs { 1, 32767, 32768, 32769, 100000, 1000000 } do
+      local s = ("0123456789abcdef"):rep(n / 16 + 1):sub(1, n)
+      local f = dir .. "/f" .. n
+      assert(fs.write(f, s))
+      T.eq(fs.read(f), s, "size " .. n)
+    end
+    -- of unknown size (fstat says 0)
+    local status = assert(fs.read("/proc/self/status"))
+    assert(status:find("^Name:"), status)
+  end),
+
+  read_unknown_size_grows = in_tmp(function(dir)
+    -- A pipe with more than the State's buffer: the buffer fills up and
+    -- is replaced by larger ones (the writer runs while we read).
+    local fifo = dir .. "/fifo"
+    sh("mkfifo " .. fifo)
+    sh("seq 1 30000 > " .. fifo .. " &")
+    local t = {}
+    for i = 1, 30000 do t[i] = i .. "\n" end
+    T.eq(fs.read(fifo), table.concat(t))
+  end),
+
+  read_during_gc = in_tmp(function(dir)
+    local small, big = dir .. "/small", dir .. "/big"
+    assert(fs.write(small, "small"))
+    -- (a big file: a userdata buffer, the copy runs GC steps; a smaller
+    -- one in the State's buffer, which the inner read must not touch)
+    local bigs, mids = ("b"):rep(200000), ("m"):rep(20000)
+    assert(fs.write(big, bigs))
+    assert(fs.write(dir .. "/mid", mids))
+    local n = T.during_gc(function()
+      for _ = 1, 30 do
+        T.eq(fs.read(big), bigs)
+        T.eq(fs.read(dir .. "/mid"), mids)
+      end
+    end, function()
+      T.eq(fs.read(small), "small")
+      T.eq(#assert(fs.list(dir)), 3)
+    end)
+    assert(n > 0, "no finalizer ran")
+    T.eq(fs.read(small), "small")
+  end),
+
+  read_write_failures = in_tmp(function(dir)
+    fails("ENOENT", dir .. "/nope: no such file or directory", fs.read(dir .. "/nope"))
+    fails("EISDIR", dir .. ": is a directory", fs.read(dir))
+    fails("ENOENT", dir .. "/nope/f: no such", fs.write(dir .. "/nope/f", "x"))
+    fails("EISDIR", dir .. ": is a directory", fs.write(dir, "x"))
+    touch(dir .. "/ro")
+    assert(fs.chmod(dir .. "/ro", octal "444"))
+    if fs.write(dir .. "/ro", "x") then
+      print("  (running as root: skipping the EACCES check)")
+    else
+      fails("EACCES", "/ro: permission denied", fs.write(dir .. "/ro", "x"))
+    end
+    -- (the State of a failed read does not leak into the next one)
+    T.eq(fs.read(dir .. "/ro"), "")
+  end),
+
+  write_atomic = in_tmp(function(dir)
+    local f = dir .. "/f"
+    T.eq(fs.write(f, "new", { atomic = true }), true, "creates it")
+    T.eq(fs.read(f), "new")
+    touch(dir .. "/io")
+    T.eq(fs.stat(f).mode, fs.stat(dir .. "/io").mode, "0666 minus the umask")
+    -- replaces the file (a new inode), keeping its mode
+    assert(fs.chmod(f, octal "751"))
+    local ino = fs.stat(f).ino
+    sh("ln " .. f .. " " .. dir .. "/hard")
+    T.eq(fs.write(f, "newer", { atomic = true }), true)
+    T.eq(fs.read(f), "newer")
+    T.eq(fs.stat(f).mode, octal "751", "mode kept")
+    assert(fs.stat(f).ino ~= ino, "a new inode")
+    T.eq(fs.read(dir .. "/hard"), "new", "the old one lives on as hard")
+    -- a link stays a link, the file it points to is replaced
+    symlink("f", dir .. "/l")
+    T.eq(fs.write(dir .. "/l", "linked", { atomic = true }), true)
+    T.eq(fs.stat(dir .. "/l", { follow = false }).type, "link")
+    T.eq(fs.read(f), "linked")
+    T.eq(sorted(assert(fs.list(dir))), "f,hard,io,l", "no temporary files left")
+  end),
+
+  write_atomic_failures = in_tmp(function(dir)
+    fails("ENOENT", dir .. "/nope/f: no such", fs.write(dir .. "/nope/f", "x", { atomic = true }))
+    fails("EISDIR", dir .. ": is a directory", fs.write(dir, "x", { atomic = true }))
+    assert(fs.mkdir(dir .. "/d"))
+    fails("EISDIR", "/d: is a directory", fs.write(dir .. "/d", "x", { atomic = true }))
+    symlink("nowhere", dir .. "/dangling")
+    fails("ENOENT", "/dangling: no such", fs.write(dir .. "/dangling", "x", { atomic = true }))
+    T.eq(sorted(assert(fs.list(dir))), "d,dangling", "no temporary files left")
+  end),
+
   getcwd_is_the_working_directory = function()
     local p = assert(io.popen("pwd -P"))
     local pwd = p:read("*l")
@@ -425,5 +538,13 @@ T.run {
     T.raises(function() fs.chmod(nowhere, 4096) end, "mode must be an integer in [0, 4095]")
     T.raises(function() fs.chmod(nowhere, -1) end, "mode must be an integer in [0, 4095]")
     T.raises(function() fs.chmod(nowhere, 0.5) end, "mode must be an integer in [0, 4095]")
+    T.raises(function() fs.read() end, "bad argument #1 to 'read'")
+    T.raises(function() fs.read("a\0b") end, "path contains a zero byte")
+    T.raises(function() fs.write(nowhere) end, "bad argument #2 to 'write'")
+    T.raises(function() fs.write(nowhere, {}) end, "bad argument #2 to 'write'")
+    T.raises(function() fs.write(nowhere, "x", 1) end, "bad argument #3 to 'write'")
+    T.raises(function() fs.write(nowhere, "x", { atomc = true }) end, "unknown option 'atomc'")
+    T.raises(function() fs.write(nowhere, "x", { append = true, atomic = true }) end,
+      "append and atomic exclude each other")
   end,
 }

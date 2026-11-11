@@ -5,6 +5,7 @@
 luajit create.lua 2345717
 luajit list.lua 19262950
 luajit paths.lua 9405214
+luajit readwrite.lua 2972507
 luajit stat.lua 50596368
 luajit stat_into.lua 20889316
 luajit walkdir.lua 10604318
@@ -13,6 +14,7 @@ luajit walkdir_prune.lua 9296928
 lust create.lua 2272056
 lust list.lua 19022074
 lust paths.lua 9307788
+lust readwrite.lua 2896850
 lust stat.lua 49880029
 lust stat_into.lua 20647756
 lust walkdir.lua 10436769
