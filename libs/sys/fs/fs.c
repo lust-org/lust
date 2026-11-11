@@ -643,6 +643,11 @@ LUST_API int luaopen_lust_sys_fs(lua_State *L) {
   int i;
 
   lua_settop(L, 0); /* (the module name) */
+  /* At most: the module, the type names and keys, and their copies as
+   * upvalues of stat. A C function is only guaranteed LUA_MINSTACK (20)
+   * slots: LuaJIT grows its stack on every push anyway, PUC Lua 5.1 would
+   * write past its end. */
+  luaL_checkstack(L, 1 + 2 * (TY_N + K_N), NULL);
   lua_createtable(L, 0, 7);
   luaL_register(L, NULL, funcs);
   for (i = 0; i < TY_N; i++) lua_pushstring(L, type_names[i]);
