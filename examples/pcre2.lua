@@ -23,7 +23,7 @@ print(assert(pcre2.new("(\\w+)@(\\w+)")):gsub("bob@example", "\\2: \\1"))
 local n = assert(pcre2.new("\\d+"))
 print((n:gsub("1 22 333", function(d) return d * 2 end)))
 
--- What RE2 cannot do: backreferences, lookaround, recursion ...
+-- Beyond regular languages: backreferences, lookaround, recursion ...
 print(assert(pcre2.new("\\b(\\w+) \\1\\b")):match("this is is a typo"))   --> is
 print(assert(pcre2.new("\\((?:[^()]|(?R))*\\)")):match("f(a(b)c)"))       --> (a(b)c)
 

@@ -30,12 +30,9 @@ src/                the `lust` binary (lust.c + build of LuaJIT)
 examples/           runnable examples, one per library (or namespace)
 docs/               conventions and how-tos for working on lust
 tools/              helper used by the meson build
-tools/absl-sources.py  checks the Abseil source list of vendor/meson.build
 tests/              test harness + cross library tests
 vendor/luajit/      LuaJIT (managed by vendor.py, never edit)
 vendor/xxhash/      xxHash (managed by vendor.py, never edit)
-vendor/re2/         RE2, not used by any library at the moment (managed by vendor.py, never edit)
-vendor/abseil/      Abseil, which RE2 needs (managed by vendor.py, never edit)
 vendor/pcre2/       PCRE2 (managed by vendor.py, never edit)
 vendor/meson.build  build definitions of the vendored dependencies
 vendor/vendor.toml  upstream repos + revisions of the above

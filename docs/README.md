@@ -49,8 +49,8 @@ resolved through pkg-config; they stay shared libraries at runtime), or
 
 ## Building
 
-Requirements: `meson`, `ninja`, a C and a C++ compiler, `make`,
-`git` and `python3` (plus the dev files of dynamic dependencies, of
+Requirements: `meson`, `ninja`, a C compiler, `make`, `git` and
+`python3` (plus the dev files of dynamic dependencies, of
 which there are currently none). The tests also use a stock `luajit`
 and PUC `lua5.1` from PATH where installed (Arch: `luajit lua51`,
 Ubuntu: `luajit lua5.1`).
@@ -59,7 +59,7 @@ Ubuntu: `luajit lua5.1`).
 # Arch Linux
 sudo pacman -S --needed meson ninja gcc make git python
 # Ubuntu
-sudo apt install meson ninja-build gcc g++ make git python3
+sudo apt install meson ninja-build gcc make git python3
 
 git clone <this repo> && cd lust
 ./dev.py build            # everything

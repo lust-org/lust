@@ -18,13 +18,7 @@ when its topic comes up; new project-wide conventions go there too.
   from `vendor/`. Nothing is downloaded at build time.
 - Build system is meson only, `meson_version: '>=1.3.0'` (Ubuntu 24.04).
   Do not use newer-only features (e.g. `build_subdir` needs 1.10).
-- C11 for our code. Only upstream `luajit.c` is built as `gnu11`. The one
-  exception is C++17 for code that wraps C++ dependencies (an `extern "C"`
-  shim) and for vendored C++ code (RE2/Abseil, currently vendored but not
-  used by any library). A C++ library links the C++ runtime statically
-  (`cpp_rt_dep`) and is
-  `lib_embed = false`: libstdc++'s static constructors (iostream, locale,
-  exception pool) cost ~110k instructions per start.
+- C11 for our code. Only upstream `luajit.c` is built as `gnu11`.
 - Prefer the Lua C API (`capi`, the default) over `ffi`: requiring an
   `ffi` library costs ~90k instructions more (FFI, `cdef`, bytecode,
   symbol lookups). Use `ffi` only where the JIT should pay off hugely:

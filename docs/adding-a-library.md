@@ -21,8 +21,6 @@
    - a library with a dynamic dependency: write it as `ffi` with
      `ffi.load()`, or set `lib_embed = false` (`.so` only, loaded by
      `lust` on demand). `tests/test_startup.py` guards `lust`'s startup.
-     C++ libraries need `lib_embed = false` too: the C++
-     runtime runs static constructors at startup.
    - a `capi` library may have a Lua part too (`lib_lua`, for code that
      reads better in Lua): its bytecode and its source are handed to the
      C code as `LUST_LUA_BC_H` and `LUST_LUA_SRC_H` to `#include`; load it
@@ -43,10 +41,9 @@ contain no `_` (`sys_env` would clash with `sys.env`).
 3. For a static dependency, add it to `vendor/vendor.toml`, vendor it
    with `vendor.py` and declare a `<dep>_dep` for it in
    `vendor/meson.build` (see `xxhash_dep`). Never add files inside
-   `vendor/<dep>/`. For a dependency that has no meson build (RE2/Abseil,
-   PCRE2) the source lists are kept in `vendor/meson.build`; after
-   upgrading RE2/Abseil run `tools/absl-sources.py --check`, after
-   upgrading PCRE2 compare the list with `vendor/pcre2/CMakeLists.txt`.
+   `vendor/<dep>/`. For a dependency that has no meson build (PCRE2)
+   the source list is kept in `vendor/meson.build`; after upgrading
+   PCRE2 compare it with `vendor/pcre2/CMakeLists.txt`.
    Make its version part of `lust.meta.versions()`: add it to the
    table in `libs/meta/meson.build` and to `libs/meta/meta.c`. A library
    exports no `version` of its own.
