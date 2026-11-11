@@ -3,8 +3,8 @@
 #   ./dev.py test --suite bench --test-args=--update
 # <flavour> <benchmark> <instructions>
 luajit exec.lua 6396570
-luajit run.lua 23719870
+luajit run.lua 24182173
 luajit spawn.lua 44034947
 lust exec.lua 6327069
-lust run.lua 23676500
+lust run.lua 24114307
 lust spawn.lua 43848501

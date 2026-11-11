@@ -29,9 +29,9 @@
  * one poll loop feeds opts.input and reads stdout and stderr to their end
  * (writing all input first could deadlock against a child that blocks
  * writing output nobody reads yet), and returns what was left unread of
- * them. run is spawn + wait, with stdout and stderr piped by default (and
- * the Child and its Streams in one userdata, see Run). poll waits for
- * output or the end of children, with a timeout: the only one there is.
+ * them. run is spawn + wait, with stdout and stderr piped by default.
+ * poll waits for output or the end of children, with a timeout: the only
+ * one there is.
  *
  * Dropping a Child neither kills the child nor waits for it: it runs on
  * (session = true: also when our terminal goes away). Once it exits, it is
@@ -78,7 +78,6 @@ extern char **environ;
 
 #define STREAM_MT "lust.sys.proc.stream"
 #define CHILD_MT "lust.sys.proc.child"
-#define RUN_MT "lust.sys.proc.run"
 
 /* Reading grows a buffer to at least this much free space (a pipe holds
  * 64 KiB, so reads are at most that large anyway). */
@@ -160,7 +159,7 @@ typedef struct {
   int writable;  /* a child's stdin */
   int closed;    /* closed by close() or wait: using it is a bug */
   int eof;       /* the child closed its end: reads return nil */
-  int hidden;    /* run's: no Lua code can reach it (see push_data) */
+  int hidden;    /* run's: no Lua code can reach it (see push_data, push_stream) */
   unsigned gen;  /* changes whenever data is consumed, or it is closed */
   char *buf;     /* read: the data at buf + off, len bytes (malloc'd) */
   size_t off, len, cap;
@@ -404,12 +403,17 @@ static int l_stream_gc(lua_State *L) {
   return 0;
 }
 
-/* Pushes a new Stream userdata. */
-static Stream *push_stream(lua_State *L, int writable) {
+/* Pushes a new Stream userdata. A hidden one (run's) gets no metatable:
+ * no methods are called on it, and its Child frees it (child_release),
+ * which saves run a finalizer call per stream. */
+static Stream *push_stream(lua_State *L, int writable, int hidden) {
   Stream *s = (Stream *)lua_newuserdata(L, sizeof *s);
   stream_init(s, writable);
-  luaL_getmetatable(L, STREAM_MT);
-  lua_setmetatable(L, -2);
+  s->hidden = hidden;
+  if (!hidden) {
+    luaL_getmetatable(L, STREAM_MT);
+    lua_setmetatable(L, -2);
+  }
   return s;
 }
 
@@ -418,9 +422,8 @@ static Stream *push_stream(lua_State *L, int writable) {
 /* ------------------------------------------------------------------ */
 
 /*
- * A started child. For spawn a userdata of its own, its Streams userdata
- * in its environment table (which anchors them, and opts.input); for run
- * part of a Run.
+ * A started child: a userdata, its Streams userdata in its environment
+ * table (which anchors them, and spawn's opts.input).
  */
 typedef struct {
   pid_t pid;        /* > 0: started */
@@ -428,7 +431,6 @@ typedef struct {
   int session;      /* leads a session (and process group) of its own */
   int reaped;       /* waited for: its status is ws */
   int ws;
-  int kill_on_gc;   /* run's: killed if run is left by an error */
   int in_fd;        /* the pipe opts.input is fed into, -1: none (any more) */
   size_t in_off;    /* how much of the input is written */
   Stream *s[NFD];   /* the "pipe" ones, NULL if none */
@@ -467,25 +469,26 @@ static void child_init(Child *c) {
   c->pidfd = c->in_fd = -1;
 }
 
-/* What a collected Child leaves: its child runs on, unless it is run's. */
+/* What a collected Child leaves: its child runs on (reaped later). */
 static void child_release(Child *c) {
   close_fd(&c->in_fd);
+  /* (hidden Streams have no finalizer of their own; the environment
+   * table keeps them alive until this ran) */
+  for (int i = 0; i < NFD; i++) {
+    if (c->s[i] != NULL && c->s[i]->hidden) stream_free(c->s[i]);
+  }
   if (c->pid > 0 && !c->reaped) {
     pid_t r;
     while ((r = waitpid(c->pid, NULL, WNOHANG)) < 0 && errno == EINTR) {}
-    if (r == 0 && c->kill_on_gc) {
-      kill(c->pid, SIGKILL);
-      while (waitpid(c->pid, NULL, 0) < 0 && errno == EINTR) {}
-    } else if (r == 0) {
-      orphan_add(c->pid);
-    }
+    if (r == 0) orphan_add(c->pid);
     c->reaped = 1;
   }
   close_fd(&c->pidfd);
 }
 
 static int l_child_gc(lua_State *L) {
-  /* (its Streams are userdata of their own, possibly collected already) */
+  /* (spawn's Streams are userdata of their own, possibly collected
+   * already: only the hidden ones are touched) */
   child_release((Child *)lua_touserdata(L, 1));
   return 0;
 }
@@ -508,23 +511,6 @@ static int l_child_index(lua_State *L) {
 
 static Child *check_child(lua_State *L, int arg) {
   return (Child *)luaL_checkudata(L, arg, CHILD_MT);
-}
-
-/*
- * One run: the Child and its Streams in one userdata (one allocation for
- * all a run holds). If run is left by an error (out of memory), __gc
- * kills and reaps the child.
- */
-typedef struct {
-  Child c;
-  Stream st[NFD];
-} Run;
-
-static int l_run_gc(lua_State *L) {
-  Run *r = (Run *)lua_touserdata(L, 1);
-  child_release(&r->c);
-  for (int i = 0; i < NFD; i++) stream_free(&r->st[i]);
-  return 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1009,57 +995,25 @@ static int finish(lua_State *L, Child *c, const char *input, size_t input_len, c
 /* run, spawn                                                          */
 /* ------------------------------------------------------------------ */
 
-/* proc.run(argv [, opts]) -> status, stdout, stderr | nil, err, code */
-static int l_run(lua_State *L) {
-  Opts o;
-  char **argv, **envp = NULL;
-  Run *r;
-  int e;
-  size_t n;
-  lua_settop(L, NSLOTS); /* (the arguments, then the slots, all nil) */
-  n = check_argv(L);
-  check_opts(L, &o, MODE_RUN);
-
-  /* Everything that allocates first (build_env last) ... */
-  argv = lua_newuserdata(L, (n + 1) * sizeof *argv);
-  r = lua_newuserdata(L, sizeof *r);
-  child_init(&r->c);
-  r->c.kill_on_gc = 1;
-  for (int i = 0; i < NFD; i++) {
-    stream_init(&r->st[i], i == IN);
-    r->st[i].hidden = 1;
-    if (o.std[i] == STD_PIPE) r->c.s[i] = &r->st[i];
-  }
-  luaL_getmetatable(L, RUN_MT);
-  lua_setmetatable(L, -2);
-  if (o.env) envp = build_env(L, o.env);
-  /* ... then argv, whose strings only the table holds: nothing may run a
-   * GC step (and a finalizer change the table) until the spawn */
-  fill_argv(L, argv, n);
-
-  reap_orphans();
-  if ((e = start(L, &r->c, argv, envp, &o)) != 0) return push_start_error(L, argv[0], o.cwd, e);
-  /* (argv[0] is anchored on the stack, see fill_argv) */
-  return finish(L, &r->c, o.input, o.input_len, argv[0]);
-}
-
 /*
- * proc.spawn(argv [, opts]) -> child | nil, err, code
- *
- * The Child's environment table holds its Streams (stdin, stdout,
- * stderr) and opts.input (fed by wait).
+ * Starts the child of run or spawn (mode) from the arguments: a Child
+ * userdata, on the stack at index NSLOTS + 2, whose environment table
+ * holds its Streams (stdin, stdout, stderr) and spawn's opts.input (fed
+ * by wait). Returns it, *program set to argv[1] (anchored on the stack);
+ * or NULL, the start error pushed (3 values).
  */
-static int l_spawn(lua_State *L) {
+static Child *start_child(lua_State *L, int mode, const char **program) {
   Opts o;
   char **argv, **envp = NULL;
   Child *c;
   int e, child_idx;
   size_t n;
   static const char *const names[NFD] = {"stdin", "stdout", "stderr"};
-  lua_settop(L, NSLOTS);
+  lua_settop(L, NSLOTS); /* (the arguments, then the slots, all nil) */
   n = check_argv(L);
-  check_opts(L, &o, MODE_SPAWN);
+  check_opts(L, &o, mode);
 
+  /* Everything that allocates first (build_env last) ... */
   argv = lua_newuserdata(L, (n + 1) * sizeof *argv);
   c = lua_newuserdata(L, sizeof *c);
   child_init(c);
@@ -1067,10 +1021,11 @@ static int l_spawn(lua_State *L) {
   lua_createtable(L, 0, NFD + 1);
   for (int i = 0; i < NFD; i++) {
     if (o.std[i] != STD_PIPE) continue;
-    c->s[i] = push_stream(L, i == IN);
+    /* (run's child, so its streams, never reaches Lua code) */
+    c->s[i] = push_stream(L, i == IN, mode == MODE_RUN);
     lua_setfield(L, -2, names[i]);
   }
-  if (o.has_input) {
+  if (o.has_input && mode == MODE_SPAWN) {
     lua_pushvalue(L, SLOT_INPUT);
     lua_setfield(L, -2, "input");
   }
@@ -1078,15 +1033,39 @@ static int l_spawn(lua_State *L) {
   luaL_getmetatable(L, CHILD_MT);
   lua_setmetatable(L, child_idx);
   if (o.env) envp = build_env(L, o.env);
+  /* ... then argv, whose strings only the table holds: nothing may run a
+   * GC step (and a finalizer change the table) until the spawn */
   fill_argv(L, argv, n);
 
   reap_orphans();
-  if ((e = start(L, c, argv, envp, &o)) != 0) return push_start_error(L, argv[0], o.cwd, e);
+  if ((e = start(L, c, argv, envp, &o)) != 0) {
+    push_start_error(L, argv[0], o.cwd, e);
+    return NULL;
+  }
+  *program = argv[0]; /* (anchored on the stack, see fill_argv) */
+  return c;
+}
+
+/* proc.run(argv [, opts]) -> status, stdout, stderr | nil, err, code */
+static int l_run(lua_State *L) {
+  const char *program, *input = NULL;
+  size_t input_len = 0;
+  Child *c = start_child(L, MODE_RUN, &program);
+  if (c == NULL) return 3;
+  if (!lua_isnil(L, SLOT_INPUT)) input = lua_tolstring(L, SLOT_INPUT, &input_len);
+  return finish(L, c, input, input_len, program);
+}
+
+/* proc.spawn(argv [, opts]) -> child | nil, err, code */
+static int l_spawn(lua_State *L) {
+  const char *program;
+  Child *c = start_child(L, MODE_SPAWN, &program);
+  if (c == NULL) return 3;
   /* (fails without pidfds, before Linux 5.3: then poll can't wait for
-   * the child, see l_poll) */
+   * the child, see l_poll; run's child needs none) */
   c->pidfd = (int)syscall(SYS_pidfd_open, c->pid, 0);
   if (c->pidfd < 0) c->pidfd = -1;
-  lua_pushvalue(L, child_idx);
+  lua_pushvalue(L, NSLOTS + 2);
   return 1;
 }
 
@@ -1421,12 +1400,6 @@ LUST_API int luaopen_lust_sys_proc(lua_State *L) {
   lua_setfield(L, 3, "__index");
   lua_pushcfunction(L, l_child_gc);
   lua_setfield(L, 3, "__gc");
-
-  /* Run's metatable */
-  luaL_newmetatable(L, RUN_MT);
-  lua_pushcfunction(L, l_run_gc);
-  lua_setfield(L, -2, "__gc");
-  lua_pop(L, 1);
 
   /* poll, with both metatables */
   lua_pushcclosure(L, l_poll, 2);
