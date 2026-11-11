@@ -174,35 +174,6 @@ static int uncatchable(int sig) {
   return 0;
 }
 
-/* The number of the (not realtime) signal named name ("SIGINT", ...), 0
- * if there is none of that name. */
-static int named_signal(const char *name) {
-  if (strncmp(name, "SIG", 3) != 0) return 0;
-  for (int s = 1; s < NSIG; s++) {
-    const char *abbrev = lust_sigabbrev(s);
-    if (abbrev != NULL && strcmp(name + 3, abbrev) == 0) return s;
-  }
-  return 0;
-}
-
-/*
- * The number of the realtime signal named name, 0 if there is none. They
- * have no names of their own: "SIGRTMIN+<n>", as lust.sys.proc reports
- * them, decimal n without leading zeros.
- */
-static int realtime_signal(const char *name) {
-  const char *d = name + 9;
-  int n = 0;
-  if (strncmp(name, "SIGRTMIN+", 9) != 0) return 0;
-  if (*d == '\0' || (d[0] == '0' && d[1] != '\0')) return 0;
-  for (; *d != '\0'; d++) {
-    if (*d < '0' || *d > '9') return 0;
-    n = n * 10 + (*d - '0');
-    if (n > SIGRTMAX - SIGRTMIN) return 0;
-  }
-  return SIGRTMIN + n;
-}
-
 static int unknown_signal(lua_State *L, int arg) {
   return luaL_argerror(L, arg, lua_pushfstring(L, "unknown signal '%s'", lua_tostring(L, arg)));
 }
@@ -210,7 +181,7 @@ static int unknown_signal(lua_State *L, int arg) {
 /* The number of the signal named at arg (one that can be handled; not a
  * realtime one, which has no name for the callback), or raises. */
 static int check_signal(lua_State *L, int arg) {
-  int sig = named_signal(luaL_checkstring(L, arg));
+  int sig = lust_signum_named(luaL_checkstring(L, arg));
   if (sig == 0) unknown_signal(L, arg);
   if (uncatchable(sig))
     luaL_argerror(L, arg, lua_pushfstring(L, "%s cannot be handled", lua_tostring(L, arg)));
@@ -299,9 +270,8 @@ static int l_on(lua_State *L) {
 /* signal.number(sig) -> number: any signal, also the uncatchable and
  * realtime ones. */
 static int l_number(lua_State *L) {
-  const char *name = luaL_checkstring(L, 1);
-  int sig = named_signal(name);
-  if (sig == 0 && (sig = realtime_signal(name)) == 0) unknown_signal(L, 1);
+  int sig = lust_signum(luaL_checkstring(L, 1));
+  if (sig == 0) unknown_signal(L, 1);
   lua_pushinteger(L, sig);
   return 1;
 }

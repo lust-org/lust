@@ -2,12 +2,39 @@ run(argv [, opts]): status, stdout, stderr | nil, err, code
   Runs program argv[1] with the arguments argv[2], ... (no shell; found
   in PATH unless it contains "/"), waits for it to exit. status: its exit
   code, or the name of the signal that killed it ("SIGKILL"). stdout,
-  stderr: its output (nil unless captured). Fails (nil, err, code) only
-  if it cannot be started ("ENOENT": not found). It gets no descriptors
-  but 0, 1, 2. opts: input (a string fed to its stdin, default: it
-  inherits ours), stdout, stderr ("capture" (default), "inherit" or
-  "null"), cwd, env (variables to set (name = value) or remove (name =
-  false), in a copy of ours)
+  stderr: its output (nil unless piped). Fails (nil, err, code) only if
+  it cannot be started ("ENOENT": not found). It gets no descriptors but
+  0, 1, 2. opts: input (a string fed to its stdin), stdin, stdout, stderr
+  ("inherit": ours, "null", "pipe" or a file from io.open; stdout and
+  stderr default to "pipe", stdin to "inherit"), cwd, env (variables to
+  set (name = value) or remove (name = false), in a copy of ours),
+  session (true: it leads a session of its own, without our terminal)
+
+spawn(argv [, opts]): child | nil, err, code
+  Starts the program as run does, without waiting. opts as for run, but
+  all of stdin, stdout, stderr default to "inherit"; input is fed by
+  child:wait(). The child runs on when the object is collected (it is
+  reaped once it exits).
+  child.stdin, child.stdout, child.stderr: a stream for each "pipe"
+  child:wait(): status, stdout, stderr: closes its stdin, reads its
+    output to the end, waits for it to exit; returns the unread rest of
+    stdout and stderr ("", nil unless piped). Again: the same status.
+  child:kill([sig]): true | nil, err, code: sends it sig (a name,
+    default "SIGTERM"; to its whole group if it leads a session).
+    "ESRCH" once it was waited for.
+  stream:read([fmt]): data | nil: "l" (default) a line without "\n",
+    "a" all to the end ("" there), n what is there, at most n bytes
+    (waits only if nothing is). nil at the end.
+  stream:lines(): iterator over the lines
+  stream:write(...): true | nil, err, "EPIPE": writes all the strings
+    and numbers; "EPIPE" if the child doesn't read any more (no SIGPIPE)
+  stream:close(): ends the child's stdin (or stops reading its output)
+
+poll(list [, timeout]): ready
+  Waits until one of the output streams or children in list is ready (a
+  stream's read won't wait, a child exited), at most timeout seconds
+  (default: no limit). Returns the ready ones, in the order of list ({}
+  after the timeout).
 
 exec(argv [, opts]): nil, err, code
   Replaces this process with program argv[1] (found as by run; the same

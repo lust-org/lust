@@ -22,6 +22,22 @@ status, out = proc.run({ "sh", "-c", 'sort; echo "$GREETING from $PWD"' },
 io.write(out) --> a  b  hello from /
 -- A program that cannot be started is the only failure.
 print("run", proc.run { "no-such-program" }) --> nil  no-such-program: ...  ENOENT
+-- Talk to a program while it runs: pipes to its stdin and from its
+-- stdout, read line by line as they come.
+local c = assert(proc.spawn({ "sh", "-c", 'while read -r x; do echo "<$x>"; done' },
+  { stdin = "pipe", stdout = "pipe" }))
+for _, word in ipairs { "one", "two" } do
+  c.stdin:write(word, "\n")
+  print("spawn", c.stdout:read()) --> <one>, then <two>
+end
+print("spawn", c:wait()) --> 0  (wait closes its stdin, so it ends)
+-- Wait for whichever has something first, with a timeout.
+local slow = assert(proc.spawn({ "sleep", "10" }))
+local fast = assert(proc.spawn({ "echo", "fast" }, { stdout = "pipe" }))
+local ready = proc.poll({ slow, fast.stdout }, 5)
+print("poll", #ready, ready[1] == fast.stdout, fast.stdout:read()) --> 1  true  fast
+slow:kill()
+print("kill", slow:wait(), fast:wait()) --> SIGTERM  0
 -- A wrapper's last step: replace this process with the program (returns
 -- only if that fails).
 print("exec", proc.exec { "no-such-program" }) --> nil  no-such-program: ...  ENOENT
