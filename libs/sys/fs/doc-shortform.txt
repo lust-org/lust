@@ -1,56 +1,51 @@
 Conventions:
-  Failures (missing file, no permission, ...) return nil, "<path>: <reason>",
-  "<errno name>" (e.g. "ENOENT"). Wrong arguments or opts raise an error.
-  Types of files: "file", "directory", "link", "fifo", "socket", "char",
-  "block", "other"
+  Every function returns nil, "<path>: <reason>", "<errno name>" (e.g.
+  "ENOENT") on failure (missing file, no permission, ...); wrong
+  arguments or opts raise. Types of files: "file", "directory", "link",
+  "fifo", "socket", "char", "block", "other". A mode: permission bits,
+  e.g. tonumber("755", 8)
 
-list(path [, opts]): {name, ...} [, {type, ...}] | nil, err, code
-  Names of the entries of directory path, without . and .., in no
-  particular order. opts: types (also return their types, as the directory
-  reports them: costs no stat)
+list(path [, opts]): {name, ...} [, {type, ...}]
+  Entries of directory path, without . and .., unordered. opts: types
+  (also return their types, as the directory reports them: no stat)
 
-walkdir(root [, opts]): iterator, state | nil, err, code
+walkdir(root [, opts]): iterator, state
   for dir, name, type in walkdir(root) do: everything below root, depth
-  first, a directory before its contents (each in no particular order),
-  links are not followed. dir is the directory the entry is in (root as
-  given, or dir .. "/" .. name of a directory yielded before): join them
-  only where the path is needed, that is the costly part of a step. A
-  directory that cannot be listed raises an error (unless it vanished)
-  when the iterator gets to it. opts: max_depth (1: only the entries of
-  root), prune (function(path): true skips the contents of that
-  directory), on_error (function(path, err, code), called instead of
-  raising)
+  first, a directory before its contents (each unordered), links not
+  followed. dir: root as given, or dir .. "/" .. name of a directory
+  yielded before; join them only where needed (the costly part). A
+  directory that cannot be listed raises when reached (unless it
+  vanished). opts: max_depth (1: root's entries only), prune
+  (function(path): true skips that directory's contents), on_error
+  (function(path, err, code), called instead of raising)
 
-stat(path [, opts [, t]]): t | nil, err, code
-  Fields: type, size, mode (permission bits, e.g. tonumber("755", 8)),
-  mtime, atime, ctime (seconds since the epoch, with fractions), uid, gid,
-  nlink, ino, dev. opts: follow (default true; false describes a link
-  itself). t: the table to set the fields in (all of them, other keys
-  are kept; left alone on failure), default a new one. Reusing one in a
-  loop halves the cost of a call
+stat(path [, opts [, t]]): t
+  Fields: type, size, mode, mtime, atime, ctime (seconds since the epoch,
+  with fractions), uid, gid, nlink, ino, dev. opts: follow (default true;
+  false: a link itself). t: the table to set all fields in (other keys
+  kept, untouched on failure), default a new one; reusing one in a loop
+  halves the cost
 
-readlink(path): str | nil, err, code
+readlink(path): str
   Target of the symbolic link path
 
-realpath(path): str | nil, err, code
+realpath(path): str
   Absolute path of path, without symbolic links, "." and ".."
 
-getcwd(): str | nil, err, code
-  The working directory (fails if it was removed: "ENOENT")
+getcwd(): str
+  The working directory ("ENOENT" if it was removed)
 
-chmod(path, mode): true | nil, err, code
-  Sets the permission bits of path (following links) to mode, a number
-  as stat reports it (e.g. tonumber("755", 8))
+chmod(path, mode): true
+  Sets the mode of path (following links)
 
-mkdir(path [, opts]): true | nil, err, code
-  Creates directory path. opts: mode (default 0777, minus the umask),
-  parents (create missing parents too; an existing directory is no error)
+mkdir(path [, opts]): true
+  Creates directory path. opts: mode (default 0777 minus the umask),
+  parents (create missing parents; an existing directory is no error)
 
-tempfile([opts]): path | nil, err, code
-  Creates a new empty file only the user can access (mkstemp), open it
+tempfile([opts]): path
+  Creates a new empty file only the user can access (mkstemp); open it
   with io.open(path, "w+"). opts: dir (default $TMPDIR or /tmp), prefix
   (default "lust-"), suffix
 
-tempdir([opts]): path | nil, err, code
-  Creates a new directory only the user can access (mkdtemp). opts: dir,
-  prefix as for tempfile
+tempdir([opts]): path
+  The same for a directory (mkdtemp). opts: dir, prefix

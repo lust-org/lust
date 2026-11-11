@@ -4,5 +4,5 @@ isatty(fd): boolean
   Whether fd is a terminal (e.g. to decide on colors)
 
 size(fd): cols, rows | nil, err, code
-  Size of the terminal fd in characters (0 if the terminal doesn't know
-  it). Not a terminal: nil, err, "ENOTTY"
+  Size of terminal fd in characters (0 if it doesn't know). Not a
+  terminal: "ENOTTY"

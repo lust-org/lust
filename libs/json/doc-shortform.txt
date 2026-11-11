@@ -1,18 +1,16 @@
 decode(str [, opts]): value | nil, err
-  Parses JSON (RFC 8259, UTF-8 validated). null becomes json.null, so nil
-  means malformed input. opts: boolean flags comments, trailing_commas,
-  nan_inf (accept NaN/Infinity), invalid_unicode; number max_depth
-  (default 1000)
+  Parses JSON (RFC 8259, UTF-8 validated); null becomes json.null, so nil
+  means malformed input. opts: comments, trailing_commas, nan_inf (accept
+  NaN/Infinity), invalid_unicode (booleans); max_depth (default 1000)
 
 encode(value [, opts]): str | nil, err
-  Writes JSON. A table with the keys 1..n is an array, any other an object
-  ({} is an object). Fails for unsupported values, NaN/Infinity and
-  nesting deeper than max_depth. Wrong arguments or opts raise an error.
-  opts: indent (spaces per level, pretty prints), max_depth (default 1000),
-  nan_inf (write NaN/Infinity)
+  A table with the keys 1..n is an array, any other (and {}) an object.
+  Fails for unsupported values, NaN/Infinity, nesting deeper than
+  max_depth; wrong arguments or opts raise. opts: indent (spaces per
+  level: pretty prints), max_depth, nan_inf (write NaN/Infinity)
 
 null: userdata
-  Stands for JSON null (a NULL light userdata, same as cjson.null)
+  JSON null (a NULL light userdata, as cjson.null)
 
 empty_array: userdata
   Encodes as []

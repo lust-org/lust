@@ -1,9 +1,9 @@
 new(pattern [, opts]): re | nil, err
-  Compiles a PCRE2 pattern (UTF-8). opts: boolean flags caseless, multiline,
-  dotall, extended, extended_more, ungreedy, dollar_endonly, no_auto_capture,
-  ucp, literal, anchored, dupnames, match_unset_backref, bytes (no UTF-8);
-  numeric limits match_limit, depth_limit, max_mem (hitting one raises an
-  error)
+  Compiles a PCRE2 pattern (UTF-8). opts: flags caseless, multiline,
+  dotall, extended, extended_more, ungreedy, dollar_endonly,
+  no_auto_capture, ucp, literal, anchored, dupnames, match_unset_backref,
+  bytes (no UTF-8); limits match_limit, depth_limit, max_mem (hitting one
+  raises)
 
 quote(str): str
   Escapes str so that it matches literally

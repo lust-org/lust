@@ -1,13 +1,12 @@
 on(sig, callback)
-  Calls callback(sig) when signal sig ("SIGINT", "SIGTERM", "SIGUSR1",
-  ...) arrives, nil restores the handling before. It runs before the next
-  Lua instruction (not within a blocking call, which continues; a loop
-  compiled by the JIT that calls no C function runs on until it exits);
-  an error it raises is raised there. Signals arriving before it ran call
-  it once. Faults (SIGSEGV, ...), SIGABRT, SIGKILL and SIGSTOP cannot be
-  handled. Only one Lua state of a process can have callbacks
+  Calls callback(sig) when signal sig ("SIGINT", "SIGTERM", ...) arrives;
+  nil restores the handling before. It runs before the next Lua
+  instruction (a blocking call continues first; a JIT-compiled loop
+  calling no C function runs on until it exits) and its errors are raised
+  there. Signals arriving before it ran call it once. Not for faults
+  (SIGSEGV, ...), SIGABRT, SIGKILL, SIGSTOP. Only one Lua state of a
+  process can have callbacks
 
 number(sig): number
-  The number of signal sig ("SIGTERM": 15), for any name proc.run
-  reports ("SIGKILL", "SIGRTMIN+2", ...), e.g. 128 + number for the exit
-  status a shell gives a program the signal killed
+  Number of signal sig ("SIGTERM": 15; any name proc.run reports, e.g.
+  "SIGRTMIN+2"); 128 + number is a shell's status for a program it killed
