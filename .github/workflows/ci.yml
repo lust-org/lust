@@ -54,7 +54,11 @@ jobs:
           fetch-depth: 0
 
       - name: Build
-        run: ./dev.py build
+        run: |
+          # Container checkouts can belong to the host runner's UID.
+          # checkout's temporary HOME does not persist its Git trust setting.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          ./dev.py build
 
       - name: Test
         run: ./dev.py test --print-errorlogs --no-suite bench

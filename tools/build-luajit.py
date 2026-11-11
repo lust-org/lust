@@ -67,11 +67,16 @@ def main() -> int:
     # string is stable and changes whenever the vendored copy is updated.
     git = subprocess.run(
         ["git", "-C", str(src), "log", "-1", "--format=%ct", "--", "."],
-        capture_output=True,
+        # Keep Git's diagnostics visible: a missing stamp must fail the build,
+        # rather than silently producing LuaJIT 2.1.ROLLING.
+        stdout=subprocess.PIPE,
         text=True,
+        check=True,
     )
-    if git.returncode == 0 and git.stdout.strip():
-        (work / ".relver").write_text(git.stdout.strip() + "\n")
+    relver = git.stdout.strip()
+    if not relver.isascii() or not relver.isdecimal():
+        sys.exit(f"error: no commit timestamp found for {src}")
+    (work / ".relver").write_text(relver + "\n")
 
     # `amalg` compiles the VM as one translation unit (faster/smaller).
     # BUILDMODE=static makes libluajit.a only, we link our own main.
