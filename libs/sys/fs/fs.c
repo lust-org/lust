@@ -6,6 +6,9 @@
  *   fs.list("src", { types = true })  --> { "a.c", ... }, { "file", ... }
  *   fs.stat("a.c")                    --> { type = "file", size = 12, ... }
  *   fs.readlink("cc")                 --> "/usr/bin/gcc"
+ *   fs.realpath("../lib/./x.so")      --> "/usr/lib/x.so"
+ *   fs.getcwd()                       --> "/home/me/src"
+ *   fs.chmod("run.sh", tonumber("755", 8))
  *   fs.mkdir("out/a/b", { parents = true })
  *   fs.tempfile { suffix = ".txt" }   --> "/tmp/lust-Xa9f2Q.txt"
  *   fs.tempdir()                      --> "/tmp/lust-p0QmZx"
@@ -378,6 +381,74 @@ static int l_readlink(lua_State *L) {
 }
 
 /* ------------------------------------------------------------------ */
+/* getcwd, realpath                                                    */
+/* ------------------------------------------------------------------ */
+
+/*
+ * fs.getcwd() -> path | nil, err, code
+ *
+ * Fails if the working directory was removed (ENOENT) or is not reachable
+ * from our root (glibc reports that as ENOENT, too, rather than return
+ * the kernel's "(unreachable)/..." path).
+ */
+static int l_getcwd(lua_State *L) {
+  char sbuf[PATH_MAX]; /* (the kernel's limit: one syscall) */
+  char *buf = sbuf;
+  size_t cap = sizeof sbuf;
+
+  /* ERANGE: a longer path (not built by the kernel, but by a C library
+   * that walks up the tree): grow the buffer (GC owned, we may raise) */
+  while (getcwd(buf, cap) == NULL) {
+    if (errno != ERANGE) return lust_push_errno(L, "getcwd", errno);
+    cap *= 2;
+    lua_settop(L, 0);
+    buf = (char *)lua_newuserdata(L, cap);
+  }
+  lua_pushstring(L, buf);
+  return 1;
+}
+
+/*
+ * fs.realpath(path) -> path | nil, err, code
+ *
+ * The absolute path without symbolic links, "." and ".." components. The
+ * buffer of PATH_MAX bytes is on our stack: realpath(path, NULL) would
+ * malloc the result, which pushing it (may raise) would leak.
+ */
+static int l_realpath(lua_State *L) {
+  const char *path = check_path(L, 1);
+  char buf[PATH_MAX];
+  if (realpath(path, buf) == NULL) return lust_push_errno(L, path, errno);
+  lua_pushstring(L, buf);
+  return 1;
+}
+
+/* ------------------------------------------------------------------ */
+/* chmod                                                               */
+/* ------------------------------------------------------------------ */
+
+/*
+ * fs.chmod(path, mode) -> true | nil, err, code
+ *
+ * mode: the permission bits (and setuid, setgid, sticky), a number as
+ * fs.stat reports it. Follows symbolic links (Linux can't change the
+ * mode of a link itself).
+ */
+static int l_chmod(lua_State *L) {
+  const char *path = check_path(L, 1);
+  lua_Number n;
+  /* (no luaL_checknumber: it would take the string "755" for 755, not
+   * for the octal 0755 that is meant) */
+  if (lua_type(L, 2) != LUA_TNUMBER) luaL_argerror(L, 2, "mode must be a number");
+  n = lua_tonumber(L, 2);
+  if (!(n >= 0 && n <= 07777 && n == (lua_Number)(int)n))
+    luaL_argerror(L, 2, "mode must be an integer in [0, 4095]");
+  if (chmod(path, (mode_t)n) != 0) return lust_push_errno(L, path, errno);
+  lua_pushboolean(L, 1);
+  return 1;
+}
+
+/* ------------------------------------------------------------------ */
 /* mkdir                                                               */
 /* ------------------------------------------------------------------ */
 
@@ -628,6 +699,9 @@ static int l_walkdir(lua_State *L) {
 
 static const luaL_Reg funcs[] = {
     {"readlink", l_readlink},
+    {"realpath", l_realpath},
+    {"getcwd", l_getcwd},
+    {"chmod", l_chmod},
     {"mkdir", l_mkdir},
     {"tempfile", l_tempfile},
     {"tempdir", l_tempdir},
@@ -647,7 +721,7 @@ LUST_API int luaopen_lust_sys_fs(lua_State *L) {
    * slots: LuaJIT grows its stack on every push anyway, PUC Lua 5.1 would
    * write past its end. */
   luaL_checkstack(L, 1 + 2 * (TY_N + K_N), NULL);
-  lua_createtable(L, 0, 7);
+  lua_createtable(L, 0, 10);
   luaL_register(L, NULL, funcs);
   for (i = 0; i < TY_N; i++) lua_pushstring(L, type_names[i]);
   for (i = 0; i < K_N; i++) lua_pushstring(L, stat_keys[i]);

@@ -32,6 +32,16 @@ stat(path [, opts [, t]]): t | nil, err, code
 readlink(path): str | nil, err, code
   Target of the symbolic link path
 
+realpath(path): str | nil, err, code
+  Absolute path of path, without symbolic links, "." and ".."
+
+getcwd(): str | nil, err, code
+  The working directory (fails if it was removed: "ENOENT")
+
+chmod(path, mode): true | nil, err, code
+  Sets the permission bits of path (following links) to mode, a number
+  as stat reports it (e.g. tonumber("755", 8))
+
 mkdir(path [, opts]): true | nil, err, code
   Creates directory path. opts: mode (default 0777, minus the umask),
   parents (create missing parents too; an existing directory is no error)

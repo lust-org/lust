@@ -1,5 +1,5 @@
 -- lust.sys.fs: list, walk and inspect directories, create directories and
--- temporary files.
+-- temporary files, resolve paths, check and change permissions.
 --
 --   build/src/lust examples/fs.lua
 
@@ -40,6 +40,16 @@ f:close()
 print("tempfile", tmp:sub(#root + 2), fs.stat(tmp).size)
 
 print("readlink", fs.readlink("/proc/self/exe"))
+
+-- Paths: where we are, where a path really leads.
+print("getcwd", fs.getcwd())
+print("realpath", fs.realpath(root .. "/src/lib/../main.lua"):sub(-12))
+
+-- Make a script executable.
+local script = root .. "/run.sh"
+assert(io.open(script, "w")):close()
+assert(fs.chmod(script, tonumber("755", 8)))
+print("chmod", string.format("%o", fs.stat(script).mode)) --> 755
 
 -- Clean up: walkdir yields a directory before its contents, so removing in
 -- reverse order empties every directory before removing it.

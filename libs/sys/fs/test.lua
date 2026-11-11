@@ -351,6 +351,44 @@ T.run {
     fails("ENAMETOOLONG", "...: " .. toolong, fs.tempfile { dir = dir_of(4096) })
   end),
 
+  getcwd_is_the_working_directory = function()
+    local p = assert(io.popen("pwd -P"))
+    local pwd = p:read("*l")
+    p:close()
+    T.eq(fs.getcwd(), pwd, "getcwd")
+  end,
+
+  realpath_resolves_links_and_dots = in_tmp(function(dir)
+    local real = assert(fs.realpath(dir)) -- ($TMPDIR may be a link itself)
+    assert(real:sub(1, 1) == "/", real)
+    assert(fs.mkdir(dir .. "/a/b", { parents = true }))
+    touch(dir .. "/a/b/f")
+    sh("ln -s a/b " .. dir .. "/l")
+    T.eq(fs.realpath(dir .. "/l/./f"), real .. "/a/b/f", "through a link")
+    T.eq(fs.realpath(dir .. "/a/b/../b//f"), real .. "/a/b/f", "dots")
+    T.eq(fs.realpath(dir .. "/a/b/.."), real .. "/a", "a directory")
+    T.eq(fs.realpath("/"), "/", "root")
+    T.eq(fs.realpath("."), fs.getcwd(), "relative to the working directory")
+    fails("ENOENT", dir .. "/a/x: no such", fs.realpath(dir .. "/a/x"))
+    sh("ln -s nowhere " .. dir .. "/dangling")
+    fails("ENOENT", "dangling: no such", fs.realpath(dir .. "/dangling"))
+    fails("ENOTDIR", "f/x: not a directory", fs.realpath(dir .. "/a/b/f/x"))
+  end),
+
+  chmod_sets_the_permission_bits = in_tmp(function(dir)
+    local f = dir .. "/f"
+    touch(f)
+    for _, m in ipairs { "600", "755", "4711", "1777", "0" } do
+      T.eq(fs.chmod(f, octal(m)), true, m)
+      T.eq(fs.stat(f).mode, octal(m), "mode " .. m)
+    end
+    -- A link is followed (its own mode can't be changed).
+    sh("ln -s f " .. dir .. "/l")
+    assert(fs.chmod(dir .. "/l", octal("644")))
+    T.eq(fs.stat(f).mode, octal("644"), "through a link")
+    fails("ENOENT", dir .. "/x: no such", fs.chmod(dir .. "/x", octal("644")))
+  end),
+
   argument_errors = function()
     T.raises(function() fs.list() end, "bad argument #1 to 'list'")
     T.raises(function() fs.list({}) end, "bad argument #1")
@@ -378,5 +416,14 @@ T.run {
     T.raises(function() fs.walkdir("/", { prune = true }) end, "prune must be a function")
     T.raises(function() fs.walkdir("/", { on_error = "x" }) end, "on_error must be a function")
     T.raises(function() fs.walkdir("/", { follow = true }) end, "unknown option 'follow'")
+    T.raises(function() fs.realpath() end, "bad argument #1 to 'realpath'")
+    T.raises(function() fs.realpath("a\0b") end, "path contains a zero byte")
+    -- (a path that doesn't exist: nothing is changed should a check fail)
+    local nowhere = "/nonexistent/lust-test"
+    T.raises(function() fs.chmod(nowhere) end, "bad argument #2 to 'chmod' (mode must be a number)")
+    T.raises(function() fs.chmod(nowhere, "755") end, "mode must be a number")
+    T.raises(function() fs.chmod(nowhere, 4096) end, "mode must be an integer in [0, 4095]")
+    T.raises(function() fs.chmod(nowhere, -1) end, "mode must be an integer in [0, 4095]")
+    T.raises(function() fs.chmod(nowhere, 0.5) end, "mode must be an integer in [0, 4095]")
   end,
 }
