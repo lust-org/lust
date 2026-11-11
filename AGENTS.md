@@ -1,7 +1,8 @@
 # AGENTS.md
 
-C libraries for LuaJIT. Each builds as a `.so` for stock luajit and as a
-static archive linked into the `lust` binary (LuaJIT + all libraries).
+C libraries for LuaJIT. Each builds as a `.so` for stock luajit (and PUC
+Lua 5.1) and as a static archive linked into the `lust` binary (LuaJIT +
+all libraries).
 
 ## Docs
 
@@ -60,8 +61,23 @@ when its topic comes up; new project-wide conventions go there too.
   code, this library included; LuaJIT drops their errors, so reentrancy
   can't be refused. Across such a call, hold no unguarded state shared
   with other calls and no pointers into memory Lua code can change.
+  (PUC Lua 5.1 does propagate them, out of the call that ran the GC
+  step, like an out of memory error.)
   Which calls, the patterns (`include/lust_scratch.h`) and the test
   helper (`T.during_gc`): `docs/gc-reentrancy.md`.
+- The `.so` modules must work with PUC Lua 5.1, too (`ffi` libraries
+  excepted: LuaJIT only). LuaJIT is more forgiving than the 5.1 API, so:
+  - Lua 5.1 C API only, none of LuaJIT's additions (`luaL_setfuncs`,
+    `luaL_testudata`, `lua_tointegerx`, ...): PUC Lua 5.1 fails the
+    `require` on the undefined symbol.
+  - A C function gets `LUA_MINSTACK` (20) stack slots: reserve more with
+    `luaL_checkstack`, once per call, not per push. LuaJIT grows its
+    stack on every push and never notices, PUC Lua 5.1 writes past the
+    end.
+  - The Lua part of a `capi` library and all test files are Lua 5.1 (no
+    `\x` escapes, `goto`, bit operators, `ffi`/`jit` without checking).
+  - The `lua5.1` test suite (`lua5.1` in PATH, installed in CI) runs
+    every library's test with PUC Lua 5.1.
 - Stock luajit finds `require "lust.<x>"` at `<cpath>/lust/<x>.so`, so
   module output names/dirs must keep that layout.
 - The Lua part of a library (`lib_lua`: every `ffi` library, optionally
@@ -82,7 +98,7 @@ when its topic comes up; new project-wide conventions go there too.
 
 ## Workflow
 
-- `./dev.py test` must pass (each lib: shared + static + lazy tests, and
+- `./dev.py test` must pass (each lib: shared + lua5.1 + static + lazy tests, and
   its `bench/` instruction counts within 3% of `bench/baseline.txt`).
   Don't re-record a baseline to hide a regression: only for intended
   changes, committing the diff with them (see

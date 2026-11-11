@@ -59,7 +59,9 @@ Libraries come in two kinds (`lib_kind` in their `meson.build`):
 
 Requirements: `meson`, `ninja`, a C and a C++ compiler, `make`,
 `git` and `python3` (plus the dev files of dynamic dependencies, of
-which there are currently none).
+which there are currently none). The tests also use a stock `luajit`
+and PUC `lua5.1` from PATH where installed (Arch: `luajit lua51`,
+Ubuntu: `luajit lua5.1`).
 
 ```sh
 # Arch Linux

@@ -11,6 +11,9 @@ finalizer).
 
 LuaJIT drops errors raised in finalizers: reentrancy cannot be refused
 with an error, a library has to work when called from a finalizer.
+PUC Lua 5.1 propagates them instead, out of the API call that ran the GC
+step: there they are one more way for that call to raise, which rule 1
+below already covers (as it does out of memory).
 
 ## Which calls (LuaJIT, `lj_api.c`)
 
