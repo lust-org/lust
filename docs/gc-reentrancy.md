@@ -64,7 +64,7 @@ fine: nothing but the C function changes its stack.
 In this order of preference:
 
 1. **Per-call ownership.** One userdata per call owns everything the
-   call holds (`Run` of `libs/sys/proc`). Safe by construction; use it
+   call holds (`Child` of `libs/sys/proc`). Safe by construction; use it
    unless an allocation per call costs much compared to the work.
 2. **Shared scratch, replaced when busy** (`include/lust_scratch.h`).
    For tiny, hot calls that reuse a buffer, a descriptor, a parser state
