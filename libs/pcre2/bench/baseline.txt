@@ -9,6 +9,6 @@ luajit gmatch.lua 339292446
 luajit gsub.lua 201950462
 lust captures.lua 146359143
 lust compile.lua 37850705
-lust find.lua 177332430
+lust find.lua 179218401
 lust gmatch.lua 337454742
 lust gsub.lua 201788431

@@ -15,6 +15,12 @@ differ by well under 1%, so a real slowdown (or speedup, which should be
 recorded) of a few percent stands out. That also lets all runs go in
 parallel, each process pinned to one cpu of its own.
 
+The benchmarks run in an environment of their own (ENV_PATH, LUA_CPATH and
+the LD_LIBRARY_PATH meson sets), not the caller's: libc's getenv/setenv
+walk every variable and starting a program copies them and searches PATH,
+so the counts of e.g. lust.sys.env would otherwise depend on the shell
+they were started from.
+
 The counts depend on the toolchain and the system libraries (e.g. libc
 or PCRE2's build flags), so after an intended change, or on another system, record
 them anew (only counts that are new or moved by more than NOISE are
@@ -29,6 +35,7 @@ results), but the counts are not compared and the test is skipped.
 import argparse
 import os
 import queue
+import shutil
 import statistics
 import subprocess
 import sys
@@ -42,6 +49,9 @@ TOLERANCE = 0.03
 # --update keeps recorded counts that are within this of the measured one:
 # re-recording noise would only churn the baselines.
 NOISE = 0.01
+# PATH of the benchmarks (searched by the programs lust.sys.proc starts):
+# fixed, as its length and order change the counts.
+ENV_PATH = "/usr/bin:/bin"
 BASELINE = "baseline.txt"
 HEADER = """\
 # User space instructions per run of each benchmark, checked by
@@ -83,9 +93,13 @@ def instructions(argv, env):
     count them. On hybrid CPUs perf prints a line per core type, the one
     not used being "<not counted>": the numeric ones are summed (a
     process moving between core types would be split over both)."""
+    # Looked up in the caller's PATH: the benchmarks' one may not have it.
+    perf = shutil.which("perf")
+    if perf is None:
+        return None
     with tempfile.NamedTemporaryFile("r") as out:
         try:
-            run(["perf", "stat", "-x,", "-e", "instructions:u", "-o", out.name, "--", *argv], env)
+            run([perf, "stat", "-x,", "-e", "instructions:u", "-o", out.name, "--", *argv], env)
         except FileNotFoundError:
             return None
         counts = [int(f[0]) for f in (line.split(",") for line in out.read().splitlines())
@@ -126,8 +140,12 @@ def main():
     if not benches:
         sys.exit(f"no benchmarks in {args.bench_dir}")
 
-    # A developer's LUA_PATH/LUA_INIT must not leak into the measurement.
-    base_env = {k: v for k, v in os.environ.items() if k not in ("LUA_PATH", "LUA_INIT")}
+    # Nothing of the caller's environment but what meson sets up for the
+    # build (see the top): its size, a developer's LUA_PATH/LUA_INIT or
+    # meson's random MALLOC_PERTURB_ must not change the counts.
+    base_env = {"PATH": ENV_PATH}
+    if "LD_LIBRARY_PATH" in os.environ:
+        base_env["LD_LIBRARY_PATH"] = os.environ["LD_LIBRARY_PATH"]
 
     baseline_path = args.bench_dir / BASELINE
     baseline = read_baseline(baseline_path)
