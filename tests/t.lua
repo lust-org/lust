@@ -42,6 +42,11 @@ function T.during_gc(fn, inner)
   end
   local pause = collectgarbage("setpause", 100)
   local stepmul = collectgarbage("setstepmul", 1000)
+  -- The pause only applies to the threshold computed at the end of the
+  -- next cycle: until then the one from before (e.g. twice the heap a
+  -- previous test left) holds, and fn may never reach it. A full cycle
+  -- now sets it from the new pause, so collecting starts right away.
+  collectgarbage()
   arm()
   local ok, err = pcall(fn)
   armed = false
