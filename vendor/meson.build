@@ -33,7 +33,9 @@ luajit_build = custom_target(
     '--src', luajit_src,
     '--work', meson.current_build_dir() / 'luajit-tree',
     '--cc', ' '.join(cc.cmd_array()),
-    '--xcflags', get_option('luajit_xcflags'),
+    # (one argument with `=`: argparse would take a value starting with
+    # `-` for an option)
+    '--xcflags=' + get_option('luajit_xcflags'),
     '--out-lib', '@OUTPUT0@',
     '--out-vmdef', '@OUTPUT1@',
     '--out-header', '@OUTPUT2@',
