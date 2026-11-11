@@ -264,7 +264,7 @@ T.run {
 
   max_mem = function()
     -- every iteration leaves a backtracking frame behind
-    local re = new("(?:a|b)*\\d", { max_mem = 1 << 14, match_limit = 1e9 })
+    local re = new("(?:a|b)*\\d", { max_mem = 2^14, match_limit = 1e9 })
     T.eq(re:test("aab1"), true)
     T.raises(function() re:test(string.rep("ab", 100000)) end, "limit")
     T.eq(new("(?:a|b)*\\d", { match_limit = 1e9 }):test(string.rep("ab", 100000) .. "1"), true)
