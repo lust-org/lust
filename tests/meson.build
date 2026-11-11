@@ -1,13 +1,17 @@
 # Tests, run with `meson test` (or `./dev.py test`).
 #
-# Every library's libs/<name>/test.lua runs twice:
+# Every library's libs/<name>/test.lua runs:
 #   - "shared": the stock `luajit` from PATH loading the freshly built .so
+#   - "lua5.1": the same with PUC Lua 5.1 (`lua5.1` or `lua51` from PATH),
+#     where installed: the .so modules have to work there, too
+#     (`ffi` libraries excepted, they need LuaJIT)
 #   - "static": the `lust` binary, the library coming from its embedded set
 #     (libraries with lib_embed = false are loaded as .so by `lust`)
-# Both are pointed away from any installed copy via LUA_CPATH.
+# All are pointed away from any installed copy via LUA_CPATH.
 
 tests_dir = meson.current_source_dir()
 luajit = find_program('luajit', required: false)
+lua51 = find_program('lua5.1', 'lua51', required: false)
 
 lua_path = tests_dir / '?.lua;;'
 shared_cpath = meson.project_build_root() / 'libs' / '?.so'
@@ -16,8 +20,12 @@ nowhere_cpath = '/nonexistent/?.so' # force use of the preloaded libraries
 if not luajit.found()
   warning('luajit not found in PATH, skipping tests of the shared modules')
 endif
+if not lua51.found()
+  warning('lua5.1 not found in PATH, skipping the tests with PUC Lua 5.1')
+endif
 # (static = true: there are no shared modules)
 shared_tests = luajit.found() and not static
+lua51_tests = lua51.found() and not static
 
 embedded_libs = []
 foreach name, info : lib_infos
@@ -37,6 +45,16 @@ foreach name : enabled_libs
       env: {'LUA_PATH': lua_path, 'LUA_CPATH': shared_cpath},
       depends: [shared_mods],
       suite: ['shared', name],
+    )
+  endif
+  if lua51_tests and lib_infos[name]['kind'] != 'ffi'
+    test(
+      name + ' (lua5.1)',
+      lua51,
+      args: [lib_test],
+      env: {'LUA_PATH': lua_path, 'LUA_CPATH': shared_cpath},
+      depends: [shared_mods],
+      suite: ['lua51', name],
     )
   endif
   if lust_feature.allowed() and lib_infos[name]['embed']
@@ -71,6 +89,25 @@ if enabled_libs.length() > 1
       depends: [shared_mods],
       suite: ['shared', 'lazy'],
     )
+  endif
+  if lua51_tests
+    # (ffi libraries are left out: their require fails there)
+    lua51_libs = []
+    foreach name : enabled_libs
+      if lib_infos[name]['kind'] != 'ffi'
+        lua51_libs += name
+      endif
+    endforeach
+    if lua51_libs.length() > 1
+      test(
+        'lazy loading (lua5.1)',
+        lua51,
+        args: [lazy, 'shared'] + lua51_libs,
+        env: {'LUA_PATH': lua_path, 'LUA_CPATH': shared_cpath},
+        depends: [shared_mods],
+        suite: ['lua51', 'lazy'],
+      )
+    endif
   endif
   if lust_feature.allowed() and embedded_libs.length() > 1
     test(
