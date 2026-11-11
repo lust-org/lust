@@ -36,16 +36,29 @@ foreach name, info : lib_infos
       # interpreter finds through this.
       env: {'LUA_PATH': luajit_src / 'src' / '?.lua'},
     )
-    sources += bytecode
+    # The source, too: what a VM gets that rejects the bytecode (PUC Lua
+    # 5.1, a stock luajit with another bytecode format; see
+    # include/lust_lua.h).
+    source = custom_target(
+      id + '_src',
+      input: info['lua'],
+      output: id + '_src.h',
+      command: [py, files('../../tools/embed-lua-source.py'), id, '@INPUT@', '@OUTPUT@'],
+    )
+    sources += [bytecode, source]
   endif
   if info['kind'] == 'ffi'
     sources += files('../ffi_shim.c')
     c_args += [
       '-DLUST_FFI_NAME=' + id,
       '-DLUST_FFI_BC_H="@0@_bc.h"'.format(id),
+      '-DLUST_FFI_SRC_H="@0@_src.h"'.format(id),
     ]
   elif info['lua'].length() > 0
-    c_args += '-DLUST_LUA_BC_H="@0@_bc.h"'.format(id)
+    c_args += [
+      '-DLUST_LUA_BC_H="@0@_bc.h"'.format(id),
+      '-DLUST_LUA_SRC_H="@0@_src.h"'.format(id),
+    ]
   endif
 
   # (static = true: a static `lust` couldn't load them)

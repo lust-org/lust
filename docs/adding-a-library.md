@@ -24,10 +24,11 @@
      C++ libraries need `lib_embed = false` too: the C++
      runtime runs static constructors at startup.
    - a `capi` library may have a Lua part too (`lib_lua`, for code that
-     reads better in Lua): its bytecode is handed to the C code as
-     `LUST_LUA_BC_H` to `#include`; load it lazily on first use like
-     `libs/sys/fs/fs.c` does, so `require` stays cheap and the C functions keep
-     working on a stock luajit whose bytecode format differs,
+     reads better in Lua): its bytecode and its source are handed to the
+     C code as `LUST_LUA_BC_H` and `LUST_LUA_SRC_H` to `#include`; load it
+     with `lust_load_lua` (`include/lust_lua.h`: the bytecode, or the
+     source where the VM rejects that, e.g. PUC Lua 5.1) lazily on first
+     use like `libs/sys/fs/fs.c` does, so `require` stays cheap,
    - the Lua part of a library must not contain table constructors
      with named fields (`{ a = 1 }`, `{ a = f() }`): the compiled bytecode
      would differ from build to build. Write `local t = {}; t.a = 1`

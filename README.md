@@ -40,8 +40,8 @@ Libraries come in two kinds (`lib_kind` in their `meson.build`):
 
 - `capi`: classic Lua C API module (all libraries at the moment). The
   default, and cheapest to `require`. It may have a Lua
-  part for what reads better in Lua, embedded as bytecode (`lust.sys.fs`'s
-  `walkdir`).
+  part for what reads better in Lua, embedded as bytecode and as source
+  (`lust.sys.fs`'s `walkdir`).
 - `ffi`: [static FFI bindings](https://evo-lua.github.io/docs/background-information/luajit/static-ffi-bindings/).
   The C code is plain C that knows nothing about Lua and just exports
   functions. A Lua file binds them with `ffi.cdef`; it is compiled to
@@ -52,8 +52,8 @@ Libraries come in two kinds (`lib_kind` in their `meson.build`):
   calls like hashing), not where the library itself dominates (regexp
   matching). A system library is best bound with `ffi.load()`: it is then
   `dlopen`ed on `require` only, so it can live inside `lust` for free.
-  The embedded bytecode must match the LuaJIT that loads it (version and
-  GC64), otherwise `require` fails with a clear error.
+  The embedded bytecode loads only into a LuaJIT with the same bytecode
+  format (version and GC64), others compile the embedded source instead.
 
 ## Building
 
@@ -156,7 +156,7 @@ include/lust.h      header shared by all libraries
 libs/<name>/        one directory per library: <name>.c, test.lua, meson.build
 libs/<ns>/<name>/   the same for library <ns>.<name> (libs/sys/proc/: lust.sys.proc)
 libs/<name>/bench/  its benchmarks + their baseline.txt (instruction counts)
-libs/ffi_shim.c     loads the embedded bytecode of the `ffi` libraries
+libs/ffi_shim.c     loads the embedded Lua part of the `ffi` libraries
 libs/lust/          defines the build targets of all libraries
 src/                the `lust` binary (lust.c + build of LuaJIT)
 examples/           runnable examples, one per library (or namespace)

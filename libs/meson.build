@@ -10,14 +10,17 @@
 #          the JIT pays off hugely (see AGENTS.md). The C code is plain C
 #          exporting (LUST_API) the functions to call; `lib_lua` is a Lua
 #          file using the LuaJIT FFI to bind them. It is compiled to
-#          bytecode and embedded, and only loaded on `require` (see
-#          libs/ffi_shim.c; no library uses it at the moment).
+#          bytecode and embedded (with its source, see include/lust_lua.h),
+#          and only loaded on `require` (see libs/ffi_shim.c; no library
+#          uses it at the moment).
 #
 #      A 'capi' library may have a Lua part, too (`lib_lua`, for code that
-#      is better written in Lua): it is compiled to bytecode the same way
-#      and the C code gets it as LUST_LUA_BC_H to #include, which defines
-#      luaJIT_BC_lust_<name>[] and luaJIT_BC_lust_<name>_SIZE; the C code
-#      decides when to load it (see libs/sys/fs/fs.c: lazily, on first use).
+#      is better written in Lua): it is embedded the same way and the C
+#      code gets it as LUST_LUA_BC_H to #include, which defines
+#      luaJIT_BC_lust_<name>[] and luaJIT_BC_lust_<name>_SIZE, and
+#      LUST_LUA_SRC_H with lust_lua_src_<name>[] and its _SIZE; the C code
+#      decides when to load it with lust_load_lua (see libs/sys/fs/fs.c:
+#      lazily, on first use).
 #
 #      Every library also MUST have a doc-shortform.txt: its API as
 #      succinct as possible, which becomes part of `lust`'s help text
@@ -101,7 +104,7 @@ foreach name : enabled_libs
   lib_infos += {
     name: {
       'dir': dir,
-      # C identifier: luaopen_lust_<id>, luaJIT_BC_lust_<id>
+      # C identifier: luaopen_lust_<id>, luaJIT_BC_lust_<id>, lust_lua_src_<id>
       'id': name.replace('.', '_'),
       'kind': lib_kind,
       'sources': lib_sources,

@@ -21,11 +21,11 @@
  * created once, at require, and kept as upvalues: pushing them is a copy,
  * not a hash + string table lookup.
  *
- * walkdir is written in Lua (fs.lua, embedded as bytecode) on top of
- * list(path, { types = true }), whose types come with the entries for free,
- * so walking costs no stat per entry. The bytecode is only loaded on the
- * first walkdir, so `require` does not pay for it, and everything else
- * keeps working on a stock luajit whose bytecode format differs.
+ * walkdir is written in Lua (fs.lua, embedded as bytecode and as source,
+ * see include/lust_lua.h) on top of list(path, { types = true }), whose
+ * types come with the entries for free, so walking costs no stat per
+ * entry. It is only loaded on the first walkdir, so `require` does not pay
+ * for it.
  */
 /* strerrorname_np, mkostemps, st_mtim, d_type ... are not plain C11 */
 #define _GNU_SOURCE
@@ -44,13 +44,16 @@
 
 #include "lust.h"
 #include "lust_errno.h"
+#include "lust_lua.h"
 #include "lust_scratch.h"
 
-#ifndef LUST_LUA_BC_H
-#error "LUST_LUA_BC_H must be defined (by libs/lust/meson.build)"
+#if !defined(LUST_LUA_BC_H) || !defined(LUST_LUA_SRC_H)
+#error "LUST_LUA_BC_H and LUST_LUA_SRC_H must be defined (by libs/lust/meson.build)"
 #endif
 /* luaJIT_BC_lust_sys_fs[] and luaJIT_BC_lust_sys_fs_SIZE: the bytecode of fs.lua */
 #include LUST_LUA_BC_H
+/* lust_lua_src_sys_fs[] and lust_lua_src_sys_fs_SIZE: its source */
+#include LUST_LUA_SRC_H
 
 #define STATE_MT "lust.sys.fs.state"
 
@@ -596,12 +599,8 @@ static int l_walkdir(lua_State *L) {
   lua_settop(L, 2);
 
   if (lua_isnil(L, lua_upvalueindex(1))) {
-    if (luaL_loadbuffer(L, (const char *)luaJIT_BC_lust_sys_fs,
-                        luaJIT_BC_lust_sys_fs_SIZE, "=lust.sys.fs") != 0)
-      return luaL_error(L,
-                        "lust.sys.fs: cannot load the embedded bytecode (%s); it "
-                        "was built for a different LuaJIT than the running one",
-                        lua_tostring(L, -1));
+    lust_load_lua(L, luaJIT_BC_lust_sys_fs, luaJIT_BC_lust_sys_fs_SIZE,
+                  lust_lua_src_sys_fs, lust_lua_src_sys_fs_SIZE, "=lust.sys.fs");
     lua_pushvalue(L, lua_upvalueindex(2));
     lua_call(L, 1, 1);
     lua_replace(L, lua_upvalueindex(1));
