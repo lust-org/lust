@@ -14,12 +14,12 @@ concurrency:
   cancel-in-progress: true
 
 # Every entry runs `./dev.py test`: every library against the stock
-# `luajit` of the distribution (shared) and inside `lust` (static), plus
-# the lazy loading, docs, startup and bytecode checks. `perf` is
-# deliberately not installed: the bench/baseline.txt instruction counts
-# are recorded on a developer machine and depend on its toolchain, so
-# test_bench.py only runs the benchmarks (checking their results) and
-# skips the comparison.
+# `luajit` and PUC `lua5.1` of the distribution (shared, lua5.1) and
+# inside `lust` (static), plus the lazy loading, docs, startup and
+# bytecode checks. `perf` is deliberately not installed: the
+# bench/baseline.txt instruction counts are recorded on a developer
+# machine and depend on its toolchain, so test_bench.py only runs the
+# benchmarks (checking their results) and skips the comparison.
 jobs:
   build-and-test:
     name: ${{ matrix.name }}
@@ -36,12 +36,12 @@ jobs:
             install: >-
               sudo apt-get update &&
               sudo apt-get install -y --no-install-recommends
-              build-essential meson ninja-build python3 luajit git binutils
+              build-essential meson ninja-build python3 luajit lua5.1 git binutils
           - name: Alpine (musl, dynamic)
             container: alpine:latest
             install: >-
               apk add --no-cache
-              build-base meson ninja python3 luajit git binutils
+              build-base meson ninja python3 luajit lua5.1 git binutils
     steps:
       # Before the checkout: without git, actions/checkout downloads a
       # tarball without history (see fetch-depth below).
