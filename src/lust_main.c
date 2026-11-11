@@ -84,13 +84,15 @@ static void lust_print_usage(void);
 #include "luajit.c"
 #undef main
 
-/* The options of luajit.c (in the same words, plus `-h|--help`), then for
- * `--help` the libraries: the doc-shortform.txt of each of them, collected
- * at build time by tools/gen-help.py. `progname` is luajit.c's (argv[0]). */
+/* A one line description, the options of luajit.c (in the same words, plus
+ * `-h|--help`), then for `--help` the libraries: the doc-shortform.txt of
+ * each of them, collected at build time by tools/gen-help.py. `progname` is luajit.c's (argv[0]). */
 static void lust_print_usage(void) {
   fputs("usage: ", stderr);
   fputs(progname, stderr);
   fputs(" [options]... [script [args]...].\n"
+        "\n"
+        "A LuaJIT runtime bundled with a slim, but proper StdLib.\n"
         "\n"
         "OPTIONS\n"
         "  -e chunk  Execute string 'chunk'.\n"
