@@ -92,6 +92,8 @@ when its topic comes up; new project-wide conventions go there too.
 
 ## Workflow
 
+- `--musl-static` builds are not supported: don't run, test or adapt
+  anything for them.
 - `./dev.py test` must pass (each lib: shared + lua5.1 + static + lazy tests, and
   its `bench/` instruction counts within 3% of `bench/baseline.txt`).
   Don't re-record a baseline to hide a regression: only for intended
