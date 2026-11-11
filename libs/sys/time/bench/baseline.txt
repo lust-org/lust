@@ -3,4 +3,6 @@
 #   ./dev.py test --suite bench --test-args=--update
 # <flavour> <benchmark> <instructions>
 luajit monotonic.lua 56235834
+luajit sleep.lua 13415047
 lust monotonic.lua 56008040
+lust sleep.lua 13329669

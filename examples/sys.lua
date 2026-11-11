@@ -45,4 +45,13 @@ os.execute("kill -HUP $PPID") -- (the shell's parent: us)
 print("signal", hups) --> 1
 signal.on("SIGHUP", nil) -- (back to the default)
 
+-- Sleep in a steady rhythm: deadlines on the monotonic clock, so the time
+-- the work takes doesn't add up as drift.
+local next = time.monotonic()
+for _ = 1, 3 do
+  next = next + 0.01
+  time.sleep_until(next)
+end
+time.sleep(0.01)
+
 print("took", string.format("%.3f s", time.monotonic() - t0))

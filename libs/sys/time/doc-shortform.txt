@@ -2,3 +2,12 @@ monotonic(): number
   Seconds (with nanosecond fractions) since an arbitrary point, steadily
   increasing: unlike os.time() it does not jump when the clock is set,
   unlike os.clock() it is not CPU time. For measuring elapsed time
+
+sleep(seconds)
+  Waits seconds (with fractions; <= 0: returns at once). A signal doesn't
+  cut it short: a signal.on callback runs once it returned
+
+sleep_until(deadline)
+  Waits until monotonic() reaches deadline (at once if it passed). For a
+  steady rhythm: next = next + interval each round, so the time the work
+  takes doesn't add up as drift

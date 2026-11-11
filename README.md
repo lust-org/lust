@@ -10,7 +10,7 @@ the libraries from your existing `LuaJIT` or `PUC Lua 5.1` runtime.
 | `lust.sys.fs`     | file system: list, walk, stat, paths, permissions, mkdir, temp files    | none (libc)                             |
 | `lust.sys.proc`   | run programs without a shell, capture their output                      | none (libc)                             |
 | `lust.sys.env`    | set and unset environment variables                                     | none (libc)                             |
-| `lust.sys.time`   | monotonic clock                                                         | none (libc)                             |
+| `lust.sys.time`   | monotonic clock, sleeps                                                 | none (libc)                             |
 | `lust.sys.random` | cryptographically secure random bytes                                   | none (libc)                             |
 | `lust.sys.term`   | terminal detection and size                                             | none (libc)                             |
 | `lust.sys.signal` | Lua callbacks for signals                                               | none (libc)                             |
