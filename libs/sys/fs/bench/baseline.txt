@@ -3,16 +3,16 @@
 #   ./dev.py test --suite bench --test-args=--update
 # <flavour> <benchmark> <instructions>
 luajit create.lua 2345717
-luajit list.lua 20087407
+luajit list.lua 19262950
 luajit stat.lua 50596368
 luajit stat_into.lua 20889316
-luajit walkdir.lua 11245633
-luajit walkdir_depth.lua 8993590
-luajit walkdir_prune.lua 9800029
+luajit walkdir.lua 10604318
+luajit walkdir_depth.lua 8469560
+luajit walkdir_prune.lua 9296928
 lust create.lua 2272056
-lust list.lua 19716265
+lust list.lua 19022074
 lust stat.lua 49880029
 lust stat_into.lua 20647756
-lust walkdir.lua 11054831
-lust walkdir_depth.lua 8858717
-lust walkdir_prune.lua 9700163
+lust walkdir.lua 10436769
+lust walkdir_depth.lua 8350681
+lust walkdir_prune.lua 9176536
