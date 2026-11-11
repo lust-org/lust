@@ -47,6 +47,10 @@ signal.on("SIGHUP", function() hups = hups + 1 end)
 os.execute("kill -HUP $PPID") -- (the shell's parent: us)
 print("signal", hups) --> 1
 signal.on("SIGHUP", nil) -- (back to the default)
+-- A program killed by a signal: run reports its name, a shell the status
+-- 128 + its number.
+local killed = proc.run { "sh", "-c", "kill -TERM $$" }
+print("signal", killed, 128 + signal.number(killed)) --> SIGTERM  143
 
 -- Sleep in a steady rhythm: deadlines on the monotonic clock, so the time
 -- the work takes doesn't add up as drift.

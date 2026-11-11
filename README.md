@@ -13,7 +13,7 @@ the libraries from your existing `LuaJIT` or `PUC Lua 5.1` runtime.
 | `lust.sys.time`   | monotonic clock, sleeps                                                 | none (libc)                             |
 | `lust.sys.random` | cryptographically secure random bytes                                   | none (libc)                             |
 | `lust.sys.term`   | terminal detection and size                                             | none (libc)                             |
-| `lust.sys.signal` | Lua callbacks for signals                                               | none (libc)                             |
+| `lust.sys.signal` | Lua callbacks for signals, signal numbers                               | none (libc)                             |
 | `lust.meta`       | versions of lust, LuaJIT and the bundled dependencies                   | none (their headers)                    |
 
 ## Layout

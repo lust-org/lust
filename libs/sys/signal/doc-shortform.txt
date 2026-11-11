@@ -6,3 +6,8 @@ on(sig, callback)
   an error it raises is raised there. Signals arriving before it ran call
   it once. Faults (SIGSEGV, ...), SIGABRT, SIGKILL and SIGSTOP cannot be
   handled. Only one Lua state of a process can have callbacks
+
+number(sig): number
+  The number of signal sig ("SIGTERM": 15), for any name proc.run
+  reports ("SIGKILL", "SIGRTMIN+2", ...), e.g. 128 + number for the exit
+  status a shell gives a program the signal killed

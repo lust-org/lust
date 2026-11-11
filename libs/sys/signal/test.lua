@@ -97,4 +97,41 @@ T.run {
     T.raises(function() signal.on("SIGSEGV", print) end, "SIGSEGV cannot be handled")
     T.raises(function() signal.on("SIGUSR1", 1) end, "bad argument #2")
   end,
+
+  number_of_a_name = function()
+    -- (the same on every Linux architecture)
+    T.eq(signal.number("SIGHUP"), 1, "SIGHUP")
+    T.eq(signal.number("SIGINT"), 2, "SIGINT")
+    T.eq(signal.number("SIGKILL"), 9, "SIGKILL")
+    T.eq(signal.number("SIGTERM"), 15, "SIGTERM")
+    T.eq(signal.number("SIGRTMIN+1"), signal.number("SIGRTMIN+0") + 1, "SIGRTMIN+1")
+    assert(signal.number("SIGRTMIN+0") > signal.number("SIGSYS"), "after the others")
+  end,
+
+  number_is_the_inverse_of_what_run_reports = function()
+    local proc = require "lust.sys.proc"
+    for _, name in ipairs { "SIGHUP", "SIGINT", "SIGKILL", "SIGUSR1", "SIGUSR2",
+                            "SIGPIPE", "SIGALRM", "SIGTERM", "SIGRTMIN+0", "SIGRTMIN+3" } do
+      -- (killed by the number: what the shell's status and run report)
+      local n = signal.number(name)
+      T.eq(proc.run { "sh", "-c", "kill -" .. n .. " $$" }, name, name)
+      local _, out = proc.run { "sh", "-c", 'sh -c "kill -' .. n .. ' \\$\\$"; echo $?' }
+      T.eq(out, (128 + n) .. "\n", name .. ": a shell's status")
+    end
+  end,
+
+  number_misuse_raises = function()
+    T.raises(function() signal.number() end, "bad argument #1 to 'number'")
+    T.raises(function() signal.number({}) end, "bad argument #1 to 'number'")
+    for _, name in ipairs { "SIGNOPE", "TERM", "sigterm", "SIGRTMIN", "SIGRTMIN+",
+                            "SIGRTMIN+01", "SIGRTMIN+-1", "SIGRTMIN+1x", "SIGRTMIN+99999999999" } do
+      T.raises(function() signal.number(name) end, "unknown signal '" .. name .. "'")
+    end
+    -- One past the last realtime signal.
+    local last = 0
+    while pcall(signal.number, "SIGRTMIN+" .. (last + 1)) do last = last + 1 end
+    assert(last >= 8, "realtime signals: " .. last + 1)
+    -- (realtime signals can't have callbacks)
+    T.raises(function() signal.on("SIGRTMIN+1", print) end, "unknown signal 'SIGRTMIN+1'")
+  end,
 }
