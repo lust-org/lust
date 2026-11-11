@@ -43,6 +43,7 @@ def main() -> int:
     ap.add_argument("--work", required=True, type=Path, help="scratch build directory")
     ap.add_argument("--cc", required=True, help="C compiler command")
     ap.add_argument("--xcflags", default="", help="extra CFLAGS for LuaJIT")
+    ap.add_argument("--ldflags", default="", help="LDFLAGS for LuaJIT's executables (e.g. -static)")
     ap.add_argument("--out-lib", required=True, type=Path)
     ap.add_argument("--out-vmdef", required=True, type=Path)
     ap.add_argument("--out-header", required=True, type=Path)
@@ -82,6 +83,8 @@ def main() -> int:
         "BUILDMODE=static",
         f"CC={args.cc}",
         f"XCFLAGS={args.xcflags}",
+        # (all of its executables: the interpreter and its build tools)
+        f"LDFLAGS={args.ldflags}",
     ]
     subprocess.run(cmd, check=True)
 

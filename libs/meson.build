@@ -77,6 +77,7 @@ endif
 # name -> {kind, sources, lua, deps} of every enabled library, see
 # libs/lust/meson.build
 lib_infos = {}
+built_libs = [] # (enabled_libs without the ones left out)
 foreach name : enabled_libs
   # Contract with libs/<name>/meson.build:
   lib_sources = [] # C sources of the library
@@ -91,6 +92,11 @@ foreach name : enabled_libs
   endif
   if lib_kind == 'ffi' and lib_lua.length() == 0
     error('@0@: lib_lua is required for "ffi" libraries'.format(name))
+  endif
+  if static and not lib_embed
+    # (only loadable as .so, which a static `lust` can't)
+    warning('@0@: left out, lib_embed = false and static = true'.format(name))
+    continue
   endif
   lib_infos += {
     name: {
@@ -108,11 +114,15 @@ foreach name : enabled_libs
       'doc_path': meson.current_source_dir() / dir / 'doc-shortform.txt',
     },
   }
+  built_libs += name
 endforeach
+enabled_libs = built_libs
 
 # The targets are defined in libs/lust/ (rather than here) on purpose, see
 # the comment in there.
 shared_mods = []
 static_lib_deps = [] # consumed by the `lust` executable
 subdir('lust')
-alias_target('libs', shared_mods)
+if shared_mods.length() > 0 # (none for static = true)
+  alias_target('libs', shared_mods)
+endif

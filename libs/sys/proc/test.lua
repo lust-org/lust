@@ -144,6 +144,10 @@ T.run {
       int setenv(const char *name, const char *value, int overwrite);
       int unsetenv(const char *name);
     ]]
+    -- (a static `lust` can't look up C symbols: ./dev.py --musl-static)
+    if not pcall(function() return ffi.C.setenv end) then
+      return print("skip: ffi.C has no setenv")
+    end
     local added = 0
     local opts = { env = { LUST_T = "x", HOME = false } }
     local n = T.during_gc(function()

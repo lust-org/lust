@@ -16,6 +16,8 @@ nowhere_cpath = '/nonexistent/?.so' # force use of the preloaded libraries
 if not luajit.found()
   warning('luajit not found in PATH, skipping tests of the shared modules')
 endif
+# (static = true: there are no shared modules)
+shared_tests = luajit.found() and not static
 
 embedded_libs = []
 foreach name, info : lib_infos
@@ -27,7 +29,7 @@ endforeach
 foreach name : enabled_libs
   lib_test = files('../libs' / lib_infos[name]['dir'] / 'test.lua')
 
-  if luajit.found()
+  if shared_tests
     test(
       name + ' (shared)',
       luajit,
@@ -60,7 +62,7 @@ endforeach
 # Loading one library must not drag in the others.
 if enabled_libs.length() > 1
   lazy = files('test_lazy.lua')
-  if luajit.found()
+  if shared_tests
     test(
       'lazy loading (shared)',
       luajit,
@@ -131,6 +133,9 @@ elif '@0@'.format(get_option('b_sanitize')) not in ['none', '[]']
   bench_skip = ['--skip', 'built with sanitizers']
 elif get_option('luajit_xcflags') != ''
   bench_skip = ['--skip', 'custom luajit_xcflags']
+elif static
+  # (another C library, linked statically: not what the baselines count)
+  bench_skip = ['--skip', 'static build']
 endif
 foreach name : enabled_libs
   bench_dir = meson.project_source_root() / 'libs' / lib_infos[name]['dir'] / 'bench'
@@ -139,7 +144,7 @@ foreach name : enabled_libs
   endif
   # The vendored luajit (the VM build `lust` uses), not the one from PATH:
   # its counts must not depend on what the system has installed.
-  flavours = ['--flavour', 'luajit', luajit_exe, shared_cpath]
+  flavours = static ? [] : ['--flavour', 'luajit', luajit_exe, shared_cpath]
   if lust_feature.allowed()
     flavours += [
       '--flavour',

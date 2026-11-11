@@ -48,19 +48,22 @@ foreach name, info : lib_infos
     c_args += '-DLUST_LUA_BC_H="@0@_bc.h"'.format(id)
   endif
 
-  mod = shared_module(
-    base,
-    sources,
-    name_prefix: prefix,
-    c_args: c_args,
-    dependencies: deps,
-    gnu_symbol_visibility: 'hidden',
-    install: true,
-    install_dir: cmoddir / 'lust' / prefix,
-    install_tag: 'lib-' + name,
-  )
-  shared_mods += mod
-  alias_target('lib-' + name, mod)
+  # (static = true: a static `lust` couldn't load them)
+  if not static
+    mod = shared_module(
+      base,
+      sources,
+      name_prefix: prefix,
+      c_args: c_args,
+      dependencies: deps,
+      gnu_symbol_visibility: 'hidden',
+      install: true,
+      install_dir: cmoddir / 'lust' / prefix,
+      install_tag: 'lib-' + name,
+    )
+    shared_mods += mod
+    alias_target('lib-' + name, mod)
+  endif
 
   if lust_feature.allowed() and info['embed']
     # Same sources again, as a static archive for linking into `lust`.

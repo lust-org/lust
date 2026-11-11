@@ -77,8 +77,9 @@ lust_exe = executable(
     cc.find_library('dl'),
   ],
   # LuaJIT's FFI and third-party C modules loaded at runtime need the host
-  # to export the Lua C API (-Wl,-E).
-  export_dynamic: true,
+  # to export the Lua C API (-Wl,-E). A static `lust` can do neither.
+  export_dynamic: not static,
+  link_args: static ? ['-static'] : [],
   install: true,
   install_tag: 'lust',
 )

@@ -18,6 +18,11 @@ project(
 py = find_program('python3')
 cc = meson.get_compiler('c')
 lust_feature = get_option('lust')
+# A fully static `lust` (see meson_options.txt): only it gets built.
+static = get_option('static')
+if static and not lust_feature.allowed()
+  error('static=true builds only `lust`, it needs lust=enabled')
+endif
 # Where the Lua part of the runtime (jit.* modules) is installed.
 datadir = get_option('prefix') / get_option('datadir') / 'lust'
 

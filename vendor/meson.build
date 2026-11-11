@@ -24,6 +24,16 @@ luajit_inc = include_directories('luajit/src', is_system: true)
 # to bytecode).
 # Always "stale": make decides whether there is work to do, and the script
 # leaves the outputs untouched if nothing changed (no needless relinking).
+#
+# glibc's libgcc_eh.a (which the compiler links into every program) needs
+# glibc's _dl_find_object, so with another C library (musl via the
+# musl-gcc wrapper) LuaJIT's external unwinding through it can't link.
+# LUAJIT_NO_UNWIND makes it unwind its frames on its own (the only cost:
+# no interplay with C++ exceptions, which nothing here uses).
+luajit_xcflags = get_option('luajit_xcflags')
+if cc.get_define('__GLIBC__', prefix: '#include <limits.h>') == ''
+  luajit_xcflags = (luajit_xcflags + ' -DLUAJIT_NO_UNWIND').strip()
+endif
 luajit_build = custom_target(
   'luajit',
   output: ['libluajit.a', 'vmdef.lua', 'luajit.h', 'luajit'],
@@ -35,7 +45,9 @@ luajit_build = custom_target(
     '--cc', ' '.join(cc.cmd_array()),
     # (one argument with `=`: argparse would take a value starting with
     # `-` for an option)
-    '--xcflags=' + get_option('luajit_xcflags'),
+    '--xcflags=' + luajit_xcflags,
+    # (static: the interpreter and the build tools of LuaJIT, too)
+    '--ldflags=' + (static ? '-static' : ''),
     '--out-lib', '@OUTPUT0@',
     '--out-vmdef', '@OUTPUT1@',
     '--out-header', '@OUTPUT2@',

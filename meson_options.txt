@@ -29,3 +29,14 @@ option(
   description: 'Extra CFLAGS used when building the LuaJIT runtime inside ' +
     'lust (e.g. -DLUAJIT_ENABLE_LUA52COMPAT)',
 )
+
+option(
+  'static',
+  type: 'boolean',
+  value: false,
+  description: 'Link `lust` (and the LuaJIT build tools) fully statically, ' +
+    'the C library included; meant for musl (`./dev.py build ' +
+    '--musl-static`). No .so modules are built (a static `lust` cannot ' +
+    'load them), libraries with lib_embed = false are left out and the ' +
+    'LuaJIT FFI cannot resolve C symbols',
+)

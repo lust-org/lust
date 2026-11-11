@@ -85,6 +85,26 @@ Meson options (`./dev.py build -D name=value`, see `meson_options.txt`):
 - `cmoddir=...`: where the `.so` files go (default `<libdir>/lua/5.1`).
 - `luajit_xcflags=...`: extra CFLAGS for the LuaJIT inside `lust`,
   e.g. `-DLUAJIT_ENABLE_LUA52COMPAT`.
+- `static=true`: link `lust` fully statically, see below.
+
+### A static `lust` with musl
+
+```sh
+sudo pacman -S --needed musl     # Arch
+sudo apt install musl-tools      # Ubuntu
+./dev.py build --musl-static     # -> build-musl/src/lust
+./dev.py test --musl-static
+```
+
+This compiles everything with `musl-gcc` and links `lust` fully
+statically (`static=true`), in its own build directory (`build-musl`,
+`-B` picks another). The binary needs nothing from the system it runs on,
+but as there is no dynamic loader:
+
+- only `lust` is built: no `.so` modules, and libraries with
+  `lib_embed = false` are left out,
+- `lust` can't load C modules (`require` of a `.so`), and the LuaJIT
+  FFI can't resolve C symbols (`ffi.C.<name>`, `ffi.load`).
 
 Using the build tree without installing:
 

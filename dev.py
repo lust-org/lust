@@ -15,9 +15,20 @@ Examples:
   ./dev.py test --suite pcre2 -v      # options go to `meson test`
   ./dev.py install lust --prefix /usr # needs root, e.g. via sudo/pkexec
   ./dev.py install libs --destdir pkg # staging for distro packaging
+  ./dev.py build --musl-static        # static `lust` with musl -> build-musl/src/lust
+  ./dev.py test --musl-static         # its tests
+
+--musl-static compiles with musl-gcc and links `lust` fully statically
+(meson option static=true) in its own build directory (default:
+build-musl). Only `lust` is built: no .so modules (a static binary can't
+load them, so libraries with lib_embed = false are left out), and the
+LuaJIT FFI can't resolve C symbols (ffi.C, ffi.load).
 """
 
 import argparse
+import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -25,9 +36,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 
 
-def run(*cmd):
-    print("+", " ".join(map(str, cmd)), file=sys.stderr, flush=True)
-    r = subprocess.run(cmd, cwd=ROOT)
+def run(*cmd, env=None):
+    prefix = "".join(f"{k}={v} " for k, v in (env or {}).items())
+    print("+", prefix + " ".join(map(str, cmd)), file=sys.stderr, flush=True)
+    r = subprocess.run(cmd, cwd=ROOT, env={**os.environ, **env} if env else None)
     if r.returncode:
         sys.exit(r.returncode)
 
@@ -43,19 +55,43 @@ def library_names():
     )
 
 
+def configured_static(builddir):
+    """The `static` option of an existing build directory."""
+    info = ROOT / builddir / "meson-info" / "intro-buildoptions.json"
+    opts = json.loads(info.read_text()) if info.exists() else []
+    return any(o["name"] == "static" and o["value"] is True for o in opts)
+
+
 def configure(args):
     """Create or update the build directory so it matches the options."""
     opts = [f"-D{d}" for d in args.define]
     if args.prefix:
         opts.append(f"--prefix={args.prefix}")
     if not (ROOT / args.builddir / "build.ninja").exists():
-        run("meson", "setup", args.builddir, *opts)
-    elif opts:
-        run("meson", "configure", args.builddir, *opts)
+        env, setup = None, []
+        if args.musl_static:
+            if not shutil.which("musl-gcc"):
+                sys.exit("--musl-static needs musl-gcc (Arch: musl, Ubuntu: musl-tools)")
+            env, setup = {"CC": "musl-gcc"}, ["-Dstatic=true"]
+        run("meson", "setup", args.builddir, *setup, *opts, env=env)
+    else:
+        # The compiler is fixed when the build directory is created: a
+        # glibc one can't be switched over. (Without --musl-static, -B
+        # build-musl just goes on as it was set up.)
+        if args.musl_static and not configured_static(args.builddir):
+            sys.exit(f"{args.builddir} is not a --musl-static build directory, "
+                     "pick another one with -B (or remove it)")
+        if opts:
+            run("meson", "configure", args.builddir, *opts)
 
 
-def check_targets(targets):
+def check_targets(targets, builddir):
     known = {"all", "lust", "libs", *library_names()}
+    if configured_static(builddir):
+        mods = [t for t in targets if t not in ("all", "lust") and t in known]
+        if mods:
+            sys.exit(f"{', '.join(mods)}: {builddir} is a --musl-static build, it has no .so modules "
+                     "(the libraries are inside `lust`: target all or lust)")
     unknown = [t for t in targets if t not in known]
     if unknown:
         sys.exit(f"unknown target(s): {', '.join(unknown)} (known: {', '.join(sorted(known))})")
@@ -64,7 +100,7 @@ def check_targets(targets):
 
 def compile_(args):
     configure(args)
-    targets = check_targets(args.targets)
+    targets = check_targets(args.targets, args.builddir)
     if "all" in targets:
         run("meson", "compile", "-C", args.builddir)
     else:
@@ -97,7 +133,9 @@ def test(args):
 
 def main():
     common = argparse.ArgumentParser(add_help=False)
-    common.add_argument("-B", "--builddir", default="build", help="build directory (default: build)")
+    common.add_argument("-B", "--builddir", help="build directory (default: build, build-musl with --musl-static)")
+    common.add_argument("--musl-static", action="store_true",
+                        help="build with musl-gcc, `lust` linked fully statically (no .so modules, no FFI C symbols)")
     common.add_argument("-D", "--define", action="append", default=[], metavar="OPT=VAL",
                         help="meson option, repeatable (see meson_options.txt)")
     common.add_argument("--prefix", help="install prefix (default: meson's, /usr/local)")
@@ -122,6 +160,8 @@ def main():
     # `test` forwards what it doesn't know to meson test (e.g. --suite xxh
     # -v, test names); for the other commands that is an error.
     args, extra = ap.parse_known_args()
+    if args.builddir is None:
+        args.builddir = "build-musl" if args.musl_static else "build"
     if args.cmd == "test":
         args.targets = extra
     elif extra:
