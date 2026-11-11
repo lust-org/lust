@@ -16,10 +16,9 @@ concurrency:
 # Every entry runs `./dev.py test`: every library against the stock
 # `luajit` and PUC `lua5.1` of the distribution (shared, lua5.1) and
 # inside `lust` (static), plus the lazy loading, docs, startup and
-# bytecode checks. `perf` is deliberately not installed: the
-# bench/baseline.txt instruction counts are recorded on a developer
-# machine and depend on its toolchain, so test_bench.py only runs the
-# benchmarks (checking their results) and skips the comparison.
+# bytecode checks. The bench/baseline.txt instruction counts are recorded
+# on a developer machine and depend on its toolchain, so these jobs
+# exclude the bench suite.
 jobs:
   build-and-test:
     name: ${{ matrix.name }}
@@ -58,4 +57,4 @@ jobs:
         run: ./dev.py build
 
       - name: Test
-        run: ./dev.py test --print-errorlogs
+        run: ./dev.py test --print-errorlogs --no-suite bench
