@@ -15,7 +15,8 @@ T.run {
   versions = function()
     local v = meta.versions()
     assert(v.lust, "no lust version")
-    T.eq("LuaJIT " .. v.luajit, jit.version)
+    -- (no jit library: PUC Lua 5.1, no LuaJIT version either)
+    if jit then T.eq("LuaJIT " .. v.luajit, jit.version) else T.eq(v.luajit, nil) end
     for k, s in pairs(v) do
       assert(formats[k], "unknown key " .. tostring(k))
       assert(type(s) == "string" and s:match(formats[k]), k .. ": " .. tostring(s))

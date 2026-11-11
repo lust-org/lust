@@ -182,19 +182,19 @@ T.run {
   end,
 
   invalid_utf8 = function()
-    T.raises(function() new("."):test("\xff") end, "UTF-8")
-    T.raises(function() new("."):gsub("a\xffb", "x") end, "UTF-8")
+    T.raises(function() new("."):test("\255") end, "UTF-8")
+    T.raises(function() new("."):gsub("a\255b", "x") end, "UTF-8")
     -- ... also a start position inside of a character
     T.raises(function() new("."):test("é", 2) end, "UTF")
-    local re, err = pcre2.new("\xff")
+    local re, err = pcre2.new("\255")
     T.eq(re, nil)
     assert(err:find("UTF", 1, true), err)
   end,
 
   bytes = function()
     local re = new(".", { bytes = true })
-    T.eq(select(2, re:gsub("\xe9\xe9", "x")), 2)
-    T.eq(select(2, re:gsub("\xff", "x")), 1)
+    T.eq(select(2, re:gsub("\233\233", "x")), 2)
+    T.eq(select(2, re:gsub("\255", "x")), 1)
     T.eq(select(2, new(".", { bytes = true }):gsub("é", "x")), 2)
   end,
 

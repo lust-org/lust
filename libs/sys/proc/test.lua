@@ -139,7 +139,8 @@ T.run {
   -- A finalizer run while run copies our environment adds variables to it
   -- (setenv, through the FFI: the test needs no other library).
   env_grows_during_gc = function()
-    local ffi = require "ffi"
+    local has_ffi, ffi = pcall(require, "ffi")
+    if not has_ffi then return print("skip: no FFI (PUC Lua 5.1)") end
     ffi.cdef [[
       int setenv(const char *name, const char *value, int overwrite);
       int unsetenv(const char *name);
