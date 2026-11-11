@@ -6,6 +6,7 @@
  *   proc.run({ "sort" }, { input = "b\na\n" })        --> 0, "a\nb\n", ""
  *   proc.run({ "make" }, { stdout = "inherit", cwd = "src" })
  *   proc.run { "no-such-program" } --> nil, "no-such-program: ...", "ENOENT"
+ *   proc.exec { "vim", file }      -- (replaces this process)
  *
  * The arguments go to the program as they are (os.execute and io.popen
  * pass a command line to sh: quoting is up to the caller, and getting it
@@ -19,6 +20,10 @@
  * stderr as they come: writing all input first could deadlock against a
  * child that blocks writing output nobody reads yet.
  *
+ * exec replaces this process with the program instead (execvpe): what a
+ * wrapper script does last. The same rule holds: the program gets no
+ * descriptors but 0, 1, 2, see exec_prepare.
+ *
  * Failing to start the program (not found, not executable, no such cwd,
  * out of descriptors) returns nil, "<program>: <reason>", "<errno name>"
  * (like lust.sys.fs). Misuse raises, see docs/error-handling.md.
@@ -31,6 +36,7 @@
 #include <poll.h>
 #include <signal.h>
 #include <spawn.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -160,8 +166,9 @@ static int check_out(lua_State *L, const char *key) {
 }
 
 /* Checks the options at index OPTS into o; the values of cwd, input and
- * env go to their stack slots, too. */
-static void check_opts(lua_State *L, Opts *o) {
+ * env go to their stack slots, too. for_exec: only cwd and env (the
+ * others are about a child we talk to). */
+static void check_opts(lua_State *L, Opts *o, int for_exec) {
   memset(o, 0, sizeof *o);
   if (lua_isnoneornil(L, OPTS)) return;
   luaL_checktype(L, OPTS, LUA_TTABLE);
@@ -175,6 +182,8 @@ static void check_opts(lua_State *L, Opts *o) {
     } else if (strcmp(k, "env") == 0) {
       if (!lua_istable(L, -1)) bad_opt(L, "%s must be a table", k);
       slot = SLOT_ENV;
+    } else if (for_exec) {
+      bad_opt(L, "unknown option '%s'", k);
     } else if (strcmp(k, "input") == 0) {
       if (lua_type(L, -1) != LUA_TSTRING) bad_opt(L, "%s must be a string", k);
       slot = SLOT_INPUT;
@@ -442,6 +451,18 @@ out:
 /* run                                                                 */
 /* ------------------------------------------------------------------ */
 
+/* The failure of starting program (in cwd, unless NULL): returns nil,
+ * "<program>[ (in <cwd>)]: <reason>", "<errno name>". */
+static int push_start_error(lua_State *L, const char *program, const char *cwd, int e) {
+  int c;
+  const char *rest;
+  if (cwd == NULL) return lust_push_errno(L, program, e);
+  rest = lust_strerror(e, &c);
+  lua_pushnil(L);
+  lua_pushfstring(L, "%s (in %s): %c%s", program, cwd, c, rest);
+  return lust_errno_result(L, e);
+}
+
 /* Pushes how the child ended: its exit code, or the name of the signal
  * that killed it. */
 static void push_status(lua_State *L, int ws) {
@@ -465,7 +486,7 @@ static int l_run(lua_State *L) {
   luaL_checktype(L, ARGV, LUA_TTABLE);
   n = lua_objlen(L, ARGV);
   if (n == 0) luaL_argerror(L, ARGV, "argv is empty");
-  check_opts(L, &o);
+  check_opts(L, &o, 0);
 
   /* Everything that allocates first ... */
   argv = lua_newuserdata(L, (n + 1) * sizeof *argv);
@@ -481,14 +502,7 @@ static int l_run(lua_State *L) {
 
   if ((e = start(r, argv, envp, &o)) != 0) {
     run_cleanup(r);
-    if (o.cwd) {
-      int c;
-      const char *rest = lust_strerror(e, &c);
-      lua_pushnil(L);
-      lua_pushfstring(L, "%s (in %s): %c%s", argv[0], o.cwd, c, rest);
-      return lust_errno_result(L, e);
-    }
-    return lust_push_errno(L, argv[0], e);
+    return push_start_error(L, argv[0], o.cwd, e);
   }
   if (io_loop(r, &o) != 0) {
     run_cleanup(r);
@@ -513,8 +527,146 @@ static int l_run(lua_State *L) {
   return 3;
 }
 
+/* ------------------------------------------------------------------ */
+/* exec                                                                */
+/* ------------------------------------------------------------------ */
+
+/*
+ * What exec changes before the execvpe, to be undone if that fails (the
+ * process goes on then, and must not notice).
+ */
+typedef struct {
+  int *fds;     /* the descriptors whose FD_CLOEXEC we set (malloc'd) */
+  size_t n;
+  int cwd;      /* our working directory (O_PATH) if opts.cwd, else -1 */
+} ExecUndo;
+
+/* Appends fd to u->fds. Returns 0, or -1 if out of memory. */
+static int undo_add(ExecUndo *u, size_t *cap, int fd) {
+  if (u->n == *cap) {
+    size_t c = *cap ? *cap * 2 : 16;
+    int *f = realloc(u->fds, c * sizeof *f);
+    if (f == NULL) return -1;
+    u->fds = f;
+    *cap = c;
+  }
+  u->fds[u->n++] = fd;
+  return 0;
+}
+
+/*
+ * Notes in u every descriptor above 2 the program would inherit (open,
+ * without FD_CLOEXEC: e.g. the files io.open opened). They are looked up
+ * in /proc/self/fd, without /proc all up to the descriptor limit are
+ * checked. Returns 0, or -1 if out of memory.
+ */
+static int collect_inherited(ExecUndo *u) {
+  size_t cap = 0;
+  DIR *d = opendir("/proc/self/fd");
+  if (d != NULL) {
+    struct dirent *de;
+    int status = 0;
+    while (status == 0 && (de = readdir(d)) != NULL) {
+      int fd = atoi(de->d_name); /* (0 for "." and "..") */
+      int fl = fd > 2 && fd != dirfd(d) ? fcntl(fd, F_GETFD) : -1;
+      if (fl >= 0 && !(fl & FD_CLOEXEC)) status = undo_add(u, &cap, fd);
+    }
+    closedir(d);
+    return status;
+  }
+  long max = sysconf(_SC_OPEN_MAX);
+  for (int fd = 3; fd < max; fd++) {
+    int fl = fcntl(fd, F_GETFD);
+    if (fl >= 0 && !(fl & FD_CLOEXEC) && undo_add(u, &cap, fd) != 0) return -1;
+  }
+  return 0;
+}
+
+/* Undoes what exec_prepare did (as far as it got) and frees u. */
+static void exec_undo(ExecUndo *u) {
+  for (size_t i = 0; i < u->n; i++) {
+    int fl = fcntl(u->fds[i], F_GETFD);
+    if (fl >= 0) fcntl(u->fds[i], F_SETFD, fl & ~FD_CLOEXEC);
+  }
+  free(u->fds);
+  u->fds = NULL;
+  u->n = 0;
+  if (u->cwd >= 0) {
+    /* (can't fail: the descriptor is a directory we were in) */
+    if (fchdir(u->cwd) != 0) {}
+    close(u->cwd);
+    u->cwd = -1;
+  }
+}
+
+/*
+ * Gets the process ready for the exec: the descriptors above 2 it would
+ * hand on get FD_CLOEXEC (like run, the program gets 0, 1, 2 only), the
+ * working directory changes to cwd (if not NULL). Returns 0; or an errno
+ * (u is undone then), ENOMEM if out of memory.
+ *
+ * Closing the descriptors instead would be final: if the exec fails, the
+ * files Lua still holds would be gone.
+ */
+static int exec_prepare(ExecUndo *u, const char *cwd) {
+  u->fds = NULL;
+  u->n = 0;
+  u->cwd = -1;
+  if (collect_inherited(u) != 0) {
+    exec_undo(u);
+    return ENOMEM;
+  }
+  for (size_t i = 0; i < u->n; i++) fcntl(u->fds[i], F_SETFD, FD_CLOEXEC);
+  if (cwd != NULL) {
+    int e;
+    u->cwd = open(".", O_PATH | O_DIRECTORY | O_CLOEXEC);
+    if (u->cwd < 0 || chdir(cwd) != 0) {
+      e = errno;
+      exec_undo(u);
+      return e;
+    }
+  }
+  return 0;
+}
+
+/*
+ * proc.exec(argv [, opts]) -> (only on failure) nil, err, code
+ *
+ * Stack slots, argv and env as for run. Lua's output (io.write, print)
+ * sits in C stdio buffers, which the exec would drop: all are flushed
+ * first.
+ */
+static int l_exec(lua_State *L) {
+  Opts o;
+  ExecUndo u;
+  char **argv, **envp = NULL;
+  int e;
+  size_t n;
+  lua_settop(L, NSLOTS);
+  luaL_checktype(L, ARGV, LUA_TTABLE);
+  n = lua_objlen(L, ARGV);
+  if (n == 0) luaL_argerror(L, ARGV, "argv is empty");
+  check_opts(L, &o, 1);
+
+  /* Everything that allocates first, then argv (see run) */
+  argv = lua_newuserdata(L, (n + 1) * sizeof *argv);
+  if (o.env) envp = build_env(L, o.env);
+  fill_argv(L, argv, n);
+
+  e = exec_prepare(&u, o.cwd);
+  if (e == ENOMEM) return luaL_error(L, "not enough memory");
+  if (e == 0) {
+    fflush(NULL);
+    execvpe(argv[0], argv, envp ? envp : environ);
+    e = errno;
+    exec_undo(&u);
+  }
+  return push_start_error(L, argv[0], o.cwd, e);
+}
+
 static const luaL_Reg funcs[] = {
     {"run", l_run},
+    {"exec", l_exec},
     {NULL, NULL},
 };
 

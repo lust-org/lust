@@ -8,3 +8,9 @@ run(argv [, opts]): status, stdout, stderr | nil, err, code
   inherits ours), stdout, stderr ("capture" (default), "inherit" or
   "null"), cwd, env (variables to set (name = value) or remove (name =
   false), in a copy of ours)
+
+exec(argv [, opts]): nil, err, code
+  Replaces this process with program argv[1] (found as by run; the same
+  pid; Lua's buffered output is written first), e.g. as the last step of
+  a wrapper. Returns only if that fails, as run would. It gets no
+  descriptors but 0, 1, 2. opts: cwd, env as for run

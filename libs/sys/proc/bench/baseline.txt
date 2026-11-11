@@ -2,5 +2,7 @@
 # tests/test_bench.py (see there). Regenerate after an intended change:
 #   ./dev.py test --suite bench --test-args=--update
 # <flavour> <benchmark> <instructions>
+luajit exec.lua 6396570
 luajit run.lua 23719870
+lust exec.lua 6327069
 lust run.lua 23676500

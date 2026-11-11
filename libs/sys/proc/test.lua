@@ -14,6 +14,32 @@ local function sh(script, opts, ...)
   return proc.run({ "sh", "-c", script, "sh", ... }, opts)
 end
 
+-- Runs the Lua `code` in a child interpreter (the one running us), with
+-- proc required; returns run's results.
+local interp = arg[-1]
+local function child(code)
+  local file = os.tmpname()
+  local f = assert(io.open(file, "w"))
+  f:write('local proc = require "lust.sys.proc"\n', code)
+  f:close()
+  local status, out, err = proc.run { interp, file }
+  os.remove(file)
+  return status, out, err
+end
+
+-- The targets of the descriptors a shell started by io.popen inherited
+-- from us, one per line (the ones vanished meanwhile, as the glob's own
+-- directory, are left out).
+local function inherited()
+  local p = assert(io.popen("readlink /proc/$$/fd/* 2>/dev/null"))
+  local out = p:read("*a")
+  p:close()
+  return out
+end
+
+-- Whether s contains the plain string needle.
+local function has(s, needle) return s:find(needle, 1, true) ~= nil end
+
 T.run {
   exit_status = function()
     T.eq(proc.run { "true" }, 0, "true")
@@ -165,5 +191,81 @@ T.run {
     end)
     for i = 1, added do ffi.C.unsetenv("LUST_GC_" .. i) end
     assert(n > 0, "no finalizer ran")
+  end,
+
+  exec_replaces_the_process = function()
+    -- (the output before the exec waits in a buffer: stdout is a pipe)
+    local status, out, err = child([[
+      -- (the first field of /proc/self/stat: our pid)
+      io.write("before ", assert(io.open("/proc/self/stat")):read("*n"), "|")
+      proc.exec({ "sh", "-c", 'echo "after $$ $X"; exit 3' }, { env = { X = "x" } })
+      print("not reached")
+    ]])
+    T.eq(err, "", "stderr")
+    T.eq(status, 3, "the program's status")
+    local a, b = out:match("^before (%d+)|after (%d+) x\n$")
+    assert(a and a == b, "output: " .. out)
+  end,
+
+  exec_in_another_directory = function()
+    local status, out = child([[
+      proc.exec({ "pwd" }, { cwd = "/" })
+    ]])
+    T.eq(status, 0, "status")
+    T.eq(out, "/\n", "output")
+  end,
+
+  exec_hands_on_only_stdio = function()
+    -- (the file is ours, without close-on-exec: inherited by io.popen's shell)
+    local path = os.tmpname()
+    local status, out = child(([[
+      local f = assert(io.open(%q))
+      proc.exec { "sh", "-c", "readlink /proc/$$/fd/* 2>/dev/null; echo end" }
+    ]]):format(path))
+    os.remove(path)
+    T.eq(status, 0, "status")
+    assert(has(out, "end\n") and not has(out, path), "inherited: " .. out)
+  end,
+
+  failed_exec_leaves_the_process_as_it_was = function()
+    local path = os.tmpname()
+    local f = assert(io.open(path, "w"))
+    f:write("data")
+    f:flush()
+    local _, cwd = proc.run { "pwd" }
+    assert(has(inherited(), path), "the file is inherited before")
+
+    fails("ENOENT", "lust-no-such-program: no such file or directory",
+      proc.exec { "lust-no-such-program" })
+    fails("ENOENT", "/nonexistent/x: no such file or directory",
+      proc.exec { "/nonexistent/x" })
+    fails("EACCES", "/: permission denied", proc.exec { "/" })
+    -- (the exec fails in /, then we are back)
+    fails("ENOENT", "lust-no-such-program (in /): no such file or directory",
+      proc.exec({ "lust-no-such-program" }, { cwd = "/" }))
+    fails("ENOENT", "lust-no-such-program (in /nonexistent): no such file or directory",
+      proc.exec({ "lust-no-such-program" }, { cwd = "/nonexistent" }))
+
+    T.eq(select(2, proc.run { "pwd" }), cwd, "working directory")
+    assert(has(inherited(), path), "the file is inherited after")
+    f:write("more")
+    f:close()
+    f = assert(io.open(path))
+    T.eq(f:read("*a"), "datamore", "the file still works")
+    f:close()
+    os.remove(path)
+  end,
+
+  exec_misuse_raises = function()
+    -- (a program that doesn't exist: nothing is replaced should a check fail)
+    local nope = { "lust-no-such-program" }
+    T.raises(function() proc.exec() end, "bad argument #1 to 'exec'")
+    T.raises(function() proc.exec {} end, "argv is empty")
+    T.raises(function() proc.exec { "lust-no-such-program", 1 } end, "argv[2] must be a string")
+    T.raises(function() proc.exec(nope, 1) end, "bad argument #2")
+    T.raises(function() proc.exec(nope, { input = "" }) end, "unknown option 'input'")
+    T.raises(function() proc.exec(nope, { stdout = "null" }) end, "unknown option 'stdout'")
+    T.raises(function() proc.exec(nope, { cwd = 1 }) end, "cwd must be a string")
+    T.raises(function() proc.exec(nope, { env = { A = 1 } }) end, "env.A must be a string")
   end,
 }

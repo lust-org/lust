@@ -22,6 +22,9 @@ status, out = proc.run({ "sh", "-c", 'sort; echo "$GREETING from $PWD"' },
 io.write(out) --> a  b  hello from /
 -- A program that cannot be started is the only failure.
 print("run", proc.run { "no-such-program" }) --> nil  no-such-program: ...  ENOENT
+-- A wrapper's last step: replace this process with the program (returns
+-- only if that fails).
+print("exec", proc.exec { "no-such-program" }) --> nil  no-such-program: ...  ENOENT
 
 -- Set variables for us (os.getenv) and every child started afterwards.
 env.set("EXAMPLE", "42")
