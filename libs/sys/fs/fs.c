@@ -29,6 +29,8 @@
  */
 /* strerrorname_np, mkostemps, st_mtim, d_type ... are not plain C11 */
 #define _GNU_SOURCE
+/* dirent64, getdents64 (implied by _GNU_SOURCE on glibc, not on musl) */
+#define _LARGEFILE64_SOURCE
 
 #include <dirent.h>
 #include <errno.h>
@@ -248,7 +250,8 @@ static int l_list(lua_State *L) {
   }
 
   for (;;) {
-    ssize_t len = getdents64(st->fd, st->buf, DIRBUF_SIZE), off;
+    /* (void *: musl declares it with a struct dirent *) */
+    ssize_t len = getdents64(st->fd, (void *)st->buf, DIRBUF_SIZE), off;
     if (len <= 0) {
       if (len < 0) e = errno;
       break;

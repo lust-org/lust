@@ -327,10 +327,14 @@ T.run {
     -- Longer than a path may be (PATH_MAX, 4096 with the NUL): the
     -- message has the beginning of the template.
     local long = dir .. "/" .. ("x"):rep(5000)
+    -- strerror(ENAMETOOLONG) of the C library (glibc "File name too
+    -- long", musl "Filename too long"), as io.open reports it, with the
+    -- first letter lowercased like lust's messages.
+    local toolong = (select(2, io.open(long)):match(": ([^:]*)$"):gsub("^%u", string.lower))
     for _, f in ipairs { fs.tempfile, fs.tempdir } do
       local v, err, code = f { dir = long }
-      fails("ENAMETOOLONG", "...: file name too long", v, err, code)
-      T.eq(#err, 4095 + #": file name too long", "message length")
+      fails("ENAMETOOLONG", "...: " .. toolong, v, err, code)
+      T.eq(#err, 4095 + #": " + #toolong, "message length")
       T.eq(err:sub(1, #dir + 2), dir .. "/x")
     end
     -- A template of 4095 bytes still fits, one of 4096 doesn't (the
@@ -344,7 +348,7 @@ T.run {
       return d
     end
     fails("ENOENT", "/lust-XXXXXX: no such", fs.tempfile { dir = dir_of(4095) })
-    fails("ENAMETOOLONG", "...: file name too long", fs.tempfile { dir = dir_of(4096) })
+    fails("ENAMETOOLONG", "...: " .. toolong, fs.tempfile { dir = dir_of(4096) })
   end),
 
   argument_errors = function()

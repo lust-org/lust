@@ -27,7 +27,9 @@ T.run {
     -- (all three standard descriptors redirected: no terminal whoever runs this)
     local out = child("print(term.isatty(0), term.isatty(1), term.size(1))",
       "%s </dev/null | cat")
-    T.eq(out, "false\tfalse\tnil\tfd 1: inappropriate ioctl for device\tENOTTY\n", "output")
+    -- (strerror(ENOTTY) is worded differently by each C library: glibc
+    -- "inappropriate ioctl for device", musl "not a tty")
+    assert(out:match("^false\tfalse\tnil\tfd 1: %l[^\t]+\tENOTTY\n$"), "output: " .. out)
   end,
 
   a_terminal = function()

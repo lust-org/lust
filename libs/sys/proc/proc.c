@@ -23,8 +23,9 @@
  * out of descriptors) returns nil, "<program>: <reason>", "<errno name>"
  * (like lust.sys.fs). Misuse raises, see docs/error-handling.md.
  */
-#define _GNU_SOURCE /* pipe2, strerrorname_np, sigabbrev_np, posix_spawn_file_actions_*_np */
+#define _GNU_SOURCE /* pipe2, strerrorname_np, sigabbrev_np, posix_spawn_file_actions_*_np (glibc) */
 
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -39,6 +40,7 @@
 
 #include "lust.h"
 #include "lust_errno.h"
+#include "lust_signame.h"
 
 extern char **environ;
 
@@ -274,6 +276,34 @@ static char **build_env(lua_State *L, int env) {
 /* starting the child                                                  */
 /* ------------------------------------------------------------------ */
 
+#ifndef __GLIBC__
+/* Without glibc's posix_spawn_file_actions_addclosefrom_np (musl): has
+ * the child close every descriptor above 2 it would inherit, i.e. the
+ * open ones without FD_CLOEXEC (the others go with the exec anyway).
+ * They are looked up in /proc/self/fd, without /proc all up to the
+ * descriptor limit are checked. Returns 0 or an error number. */
+static int add_close_inherited(posix_spawn_file_actions_t *fa) {
+  int e = 0;
+  DIR *d = opendir("/proc/self/fd");
+  if (d != NULL) {
+    struct dirent *de;
+    while (e == 0 && (de = readdir(d)) != NULL) {
+      int fd = atoi(de->d_name); /* (0 for "." and "..") */
+      int fl = fd > 2 && fd != dirfd(d) ? fcntl(fd, F_GETFD) : -1;
+      if (fl >= 0 && !(fl & FD_CLOEXEC)) e = posix_spawn_file_actions_addclose(fa, fd);
+    }
+    closedir(d);
+    return e;
+  }
+  long max = sysconf(_SC_OPEN_MAX);
+  for (int fd = 3; e == 0 && fd < max; fd++) {
+    int fl = fcntl(fd, F_GETFD);
+    if (fl >= 0 && !(fl & FD_CLOEXEC)) e = posix_spawn_file_actions_addclose(fa, fd);
+  }
+  return e;
+}
+#endif
+
 /*
  * Creates the pipes and starts the child. Returns 0, or the errno of what
  * failed (r is cleaned up by the caller).
@@ -307,7 +337,11 @@ static int start(Run *r, char **argv, char **envp, const Opts *o) {
       e = posix_spawn_file_actions_addopen(&fa, i, "/dev/null", O_WRONLY, 0);
   }
   /* (everything above 2: the pipes and whatever else is open) */
+#ifdef __GLIBC__
   if (e == 0) e = posix_spawn_file_actions_addclosefrom_np(&fa, 3);
+#else
+  if (e == 0) e = add_close_inherited(&fa);
+#endif
   if (e == 0 && o->cwd) e = posix_spawn_file_actions_addchdir_np(&fa, o->cwd);
   if (e == 0) e = posix_spawnp(&r->pid, argv[0], &fa, NULL, argv, envp ? envp : environ);
   posix_spawn_file_actions_destroy(&fa);
@@ -415,7 +449,7 @@ static void push_status(lua_State *L, int ws) {
     lua_pushinteger(L, WEXITSTATUS(ws));
   } else {
     int sig = WTERMSIG(ws);
-    const char *name = sigabbrev_np(sig);
+    const char *name = lust_sigabbrev(sig);
     if (name != NULL) lua_pushfstring(L, "SIG%s", name);
     else lua_pushfstring(L, "SIGRTMIN+%d", sig - SIGRTMIN); /* (the only ones without) */
   }

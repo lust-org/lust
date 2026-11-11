@@ -35,6 +35,7 @@
 #include <string.h>
 
 #include "lust.h"
+#include "lust_signame.h"
 
 /* Registry keys (their addresses): the callbacks, indexed by signal
  * number, and the guard restoring the signals when the state is closed.
@@ -128,7 +129,7 @@ static void run_pending(lua_State *L, lua_Debug *ar) {
   lua_rawgeti(L, -1, sig);
   lua_remove(L, -2);
   if (lua_isfunction(L, -1)) {
-    lua_pushfstring(L, "SIG%s", sigabbrev_np(sig));
+    lua_pushfstring(L, "SIG%s", lust_sigabbrev(sig));
     lua_call(L, 1, 0);
   } else {
     lua_pop(L, 1); /* (removed meanwhile) */
@@ -177,7 +178,7 @@ static int check_signal(lua_State *L, int arg) {
   const char *name = luaL_checkstring(L, arg);
   if (strncmp(name, "SIG", 3) == 0) {
     for (int s = 1; s < NSIG; s++) {
-      const char *abbrev = sigabbrev_np(s);
+      const char *abbrev = lust_sigabbrev(s);
       if (abbrev != NULL && strcmp(name + 3, abbrev) == 0) {
         if (uncatchable(s)) luaL_argerror(L, arg, lua_pushfstring(L, "%s cannot be handled", name));
         return s;
