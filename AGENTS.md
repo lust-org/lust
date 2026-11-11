@@ -98,6 +98,10 @@ when its topic comes up; new project-wide conventions go there too.
   changes, committing the diff with them (see
   `docs/benchmark-regressions.md`). Every library needs `bench/*.lua`
   exercising its API.
+- Pin every benchmark or instruction count run to a single CPU
+  (`taskset -c <cpu> perf stat ...`), ad hoc ones too; `test_bench.py`
+  does it itself. On hybrid CPUs a process moving between core types
+  gets each core type's count scaled up by perf, and the sum is wrong.
 - Errors: misuse and out of memory raise, bad input returns `nil, err`
   (unless `nil` is a normal result); see `docs/error-handling.md`.
 - Commit each finished change separately; amend when asked to change a
