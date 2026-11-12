@@ -1,6 +1,6 @@
 -- Hashing many distinct, freshly built strings (as when hashing keys),
 -- so string creation and interning are part of the work.
-local xxh = require "lust.xxh"
+local xxh = require "lust.hash.xxh"
 
 local acc32, acc64 = 0, 0
 for i = 1, 50000 do

@@ -16,7 +16,7 @@ written `obj:method(args): result`), further lines are an indented
 description. Plain text, no tabs; the output indents it below the library
 name:
 
-  xxh
+  hash.xxh
     xxh32(str [, seed]): number
       32 bit hash of str ...
 

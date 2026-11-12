@@ -1,7 +1,7 @@
 /*
- * lust.xxh: xxHash (statically linked from vendor/xxhash).
+ * lust.hash.xxh: xxHash (statically linked from vendor/xxhash).
  *
- *   local xxh = require "lust.xxh"
+ *   local xxh = require "lust.hash.xxh"
  *   xxh.xxh32("abc")        --> number (fits a double exactly)
  *   xxh.xxh64("abc")        --> "44bc2cf5ad770999" (hex: 64 bit do not fit
  *                               a Lua number)
@@ -46,7 +46,7 @@ static const luaL_Reg funcs[] = {
     {NULL, NULL},
 };
 
-LUST_API int luaopen_lust_xxh(lua_State *L) {
+LUST_API int luaopen_lust_hash_xxh(lua_State *L) {
   lua_newtable(L);
   luaL_register(L, NULL, funcs);
   return 1;

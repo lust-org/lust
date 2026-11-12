@@ -14,7 +14,7 @@ A collection of C libraries for LuaJIT, with two ways to use each of them:
   [Adding a library](adding-a-library.md).
 
 ```lua
-local xxh = require "lust.xxh"
+local xxh = require "lust.hash.xxh"
 print(xxh.xxh64("abc")) --> 44bc2cf5ad770999
 ```
 
@@ -65,7 +65,7 @@ git clone <this repo> && cd lust
 ./dev.py build            # everything
 ./dev.py build lust       # only the `lust` binary  -> build/src/lust
 ./dev.py build libs       # all libraries as .so    -> build/libs/lust/*.so
-./dev.py build xxh        # a single library
+./dev.py build hash.xxh   # a single library
 ./dev.py test
 ```
 
@@ -73,7 +73,7 @@ git clone <this repo> && cd lust
 (`meson setup build && meson compile -C build && meson test -C build`).
 Meson options (`./dev.py build -D name=value`, see `meson_options.txt`):
 
-- `libs=xxh,pcre2,json,fs`: build only these libraries (default: all). This also
+- `libs=hash.xxh,pcre2,json,sys.fs`: build only these libraries (default: all). This also
   decides which libraries get linked into `lust`.
 - `lust=disabled`: don't build the `lust` binary (skips building LuaJIT).
 - `cmoddir=...`: where the `.so` files go (default `<libdir>/lua/5.1`).
@@ -103,8 +103,8 @@ but as there is no dynamic loader:
 Using the build tree without installing:
 
 ```sh
-LUA_CPATH="$PWD/build/libs/?.so" luajit -e 'print(require("lust.xxh").xxh64("abc"))'
-build/src/lust -e 'print(require("lust.xxh").xxh64("abc"))'
+LUA_CPATH="$PWD/build/libs/?.so" luajit -e 'print(require("lust.hash.xxh").xxh64("abc"))'
+build/src/lust -e 'print(require("lust.hash.xxh").xxh64("abc"))'
 ```
 
 `examples/*.lua` show each library and run with the built `lust`:
@@ -123,7 +123,7 @@ sudo/pkexec).
 
 ```sh
 ./dev.py install                        # to /usr/local
-./dev.py install lust xxh --prefix /usr
+./dev.py install lust hash.xxh --prefix /usr
 ./dev.py install --prefix /usr --destdir pkg   # staging, for packaging
 ```
 

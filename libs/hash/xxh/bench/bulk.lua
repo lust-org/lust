@@ -1,5 +1,5 @@
 -- Throughput: hashing large buffers (64 KiB and 1 MiB).
-local xxh = require "lust.xxh"
+local xxh = require "lust.hash.xxh"
 
 local small = ("0123456789abcdef"):rep(4096) -- 64 KiB
 local big = small:rep(16) -- 1 MiB

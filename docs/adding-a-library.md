@@ -6,11 +6,11 @@
      (`#include "lust.h"`); for an `ffi` library: the plain C sources
      (functions tagged `LUST_API`) and `<name>.lua`, see `libs/ffi_shim.c`,
    - `meson.build` setting `lib_sources` and `lib_deps` (and for `ffi`:
-     `lib_kind = 'ffi'`, `lib_lua`); copy `libs/xxh/meson.build`
+     `lib_kind = 'ffi'`, `lib_lua`); copy `libs/hash/xxh/meson.build`
      (no `ffi` library exists at the moment, see `libs/ffi_shim.c`),
-   - `test.lua` (see `libs/xxh/test.lua`),
+   - `test.lua` (see `libs/hash/xxh/test.lua`),
    - `doc-shortform.txt`: the API as succinct as possible (format: see
-     `tools/gen-help.py`, example: `libs/xxh/doc-shortform.txt`). It is
+     `tools/gen-help.py`, example: `libs/hash/xxh/doc-shortform.txt`). It is
      part of the usage text of `lust` (`lust --help`, section `LIBRARIES`; plain `-h` lists only the options), and
      `tests/test_doc.lua` checks that it lists exactly what the module
      exports. The build fails without it,

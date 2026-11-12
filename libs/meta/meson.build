@@ -5,7 +5,7 @@
 lib_sources = files('meta.c')
 meta_args = ['-DLUST_VERSION="@0@"'.format(meson.project_version())]
 lib_deps = []
-foreach lib, dep : {'xxh': 'xxhash', 'json': 'yyjson', 'pcre2': 'pcre2'}
+foreach lib, dep : {'hash.xxh': 'xxhash', 'json': 'yyjson', 'pcre2': 'pcre2'}
   if lib in enabled_libs
     meta_args += '-DMETA_HAVE_' + dep.to_upper()
     lib_deps += get_variable(dep + '_dep').partial_dependency(

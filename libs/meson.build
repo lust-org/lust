@@ -5,7 +5,7 @@
 #   2. create libs/<name>/ with a test.lua and a meson.build that sets
 #      `lib_sources` and `lib_deps`, plus `lib_kind` (default 'capi'):
 #        - 'capi': <name>.c exports `luaopen_lust_<name>` tagged LUST_API
-#          and uses the Lua C API (see libs/xxh/meson.build). Preferred.
+#          and uses the Lua C API (see libs/hash/xxh/meson.build). Preferred.
 #        - 'ffi': static FFI bindings, costlier to `require`: only where
 #          the JIT pays off hugely (see AGENTS.md). The C code is plain C
 #          exporting (LUST_API) the functions to call; `lib_lua` is a Lua
@@ -44,7 +44,7 @@
 # would both export `luaopen_lust_sys_env`.
 
 all_libs = [
-  'xxh',
+  'hash.xxh',
   'pcre2',
   'json',
   'sys.fs',

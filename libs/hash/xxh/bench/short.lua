@@ -1,6 +1,6 @@
 -- Call overhead: xxh32/xxh64 of short strings (1..64 bytes), with and
 -- without a seed, many times over the same few strings.
-local xxh = require "lust.xxh"
+local xxh = require "lust.hash.xxh"
 
 local strs = {}
 for n = 1, 64 do strs[n] = ("abcdefghijklmnopqrstuvwxyz0123456789"):rep(2):sub(1, n) end

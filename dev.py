@@ -5,12 +5,12 @@ Targets (for `build` and `install`):
   all      everything (the default)
   lust     the statically linked `lust` interpreter
   libs     all libraries as loadable .so modules
-  <name>   a single library, e.g. `xxh` or `sys.env` (see libs/)
+  <name>   a single library, e.g. `hash.xxh` or `sys.env` (see libs/)
 
 Examples:
   ./dev.py build                      # everything
-  ./dev.py build xxh                  # only libs/xxh as lust/xxh.so
-  ./dev.py build lust -D libs=xxh,pcre2 # configure which libs get built
+  ./dev.py build hash.xxh             # only libs/hash/xxh as lust/hash/xxh.so
+  ./dev.py build lust -D libs=hash.xxh,pcre2 # configure which libs get built
   ./dev.py test
   ./dev.py test --suite pcre2 -v      # options go to `meson test`
   ./dev.py install lust --prefix /usr # needs root, e.g. via sudo/pkexec
@@ -153,11 +153,11 @@ def main():
     p.set_defaults(fn=install)
 
     # No positional arguments: everything dev.py doesn't know is collected
-    # in order (see below) and goes to `meson test`, e.g. --suite xxh.
+    # in order (see below) and goes to `meson test`, e.g. --suite hash.xxh.
     p = sub.add_parser("test", parents=[common], help="run the tests (extra args go to meson test)")
     p.set_defaults(fn=test)
 
-    # `test` forwards what it doesn't know to meson test (e.g. --suite xxh
+    # `test` forwards what it doesn't know to meson test (e.g. --suite hash.xxh
     # -v, test names); for the other commands that is an error.
     args, extra = ap.parse_known_args()
     if args.builddir is None:

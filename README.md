@@ -4,7 +4,7 @@ the libraries from your existing `LuaJIT` or `PUC Lua 5.1` runtime.
 
 | library           | what                                                                    | dependency                              |
 | -----------       | -------------------                                                     | --------------------------------------- |
-| `lust.xxh`        | xxHash                                                                  | `vendor/xxhash`, linked statically      |
+| `lust.hash.xxh`   | xxHash                                                                  | `vendor/xxhash`, linked statically      |
 | `lust.pcre2`      | PCRE2 (Perl compatible) regular expressions                             | `vendor/pcre2`, linked statically       |
 | `lust.json`       | JSON (2 to 4 times faster than lua-cjson, see `libs/json/vs-cjson.lua`) | `vendor/yyjson`, linked statically      |
 | `lust.sys.fs`     | file system: read, write, list, walk, stat, paths, mkdir, temp files    | none (libc)                             |

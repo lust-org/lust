@@ -1,5 +1,5 @@
 local T = require "t"
-local xxh = require "lust.xxh"
+local xxh = require "lust.hash.xxh"
 
 T.run {
   xxh32_known_vectors = function()
