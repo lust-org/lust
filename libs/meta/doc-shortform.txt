@@ -1,3 +1,4 @@
 versions(): table
   Versions as strings: lust, luajit (jit.version without "LuaJIT "), and
-  the dependencies bundled in this build: xxhash, yyjson, pcre2
+  the dependencies bundled in this build: xxhash, yyjson, pcre2,
+  mbedtls

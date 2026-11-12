@@ -5,6 +5,9 @@ the libraries from your existing `LuaJIT` or `PUC Lua 5.1` runtime.
 | library           | what                                                                    | dependency                              |
 | -----------       | -------------------                                                     | --------------------------------------- |
 | `lust.hash.xxh`   | xxHash                                                                  | `vendor/xxhash`, linked statically      |
+| `lust.hash.md5`   | MD5, one-shot or incremental                                            | `vendor/mbedtls`, linked statically     |
+| `lust.hash.sha1`  | SHA-1, one-shot or incremental                                          | `vendor/mbedtls`, linked statically     |
+| `lust.hash.sha256`| SHA-256, one-shot or incremental                                        | `vendor/mbedtls`, linked statically     |
 | `lust.pcre2`      | PCRE2 (Perl compatible) regular expressions                             | `vendor/pcre2`, linked statically       |
 | `lust.json`       | JSON (2 to 4 times faster than lua-cjson, see `libs/json/vs-cjson.lua`) | `vendor/yyjson`, linked statically      |
 | `lust.sys.fs`     | file system: read, write, list, walk, stat, paths, mkdir, temp files    | none (libc)                             |
@@ -34,6 +37,7 @@ src/                the `lust` binary
 tests/              test harness + cross library tests
 tools/              helper used by the meson build
 vendor/luajit/      LuaJIT (managed by vendor.py, never edit)
+vendor/mbedtls/     Mbed TLS + TF-PSA-Crypto (managed by vendor.py, never edit)
 vendor/meson.build  build definitions of the vendored dependencies
 vendor/pcre2/       PCRE2 (managed by vendor.py, never edit)
 vendor/vendor.toml  upstream repos + revisions

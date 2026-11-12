@@ -4,7 +4,7 @@
  *   local meta = require "lust.meta"
  *   meta.versions() --> {lust = "0.0.1", luajit = "2.1.1794236686",
  *                        xxhash = "0.8.4", yyjson = "0.13.0",
- *                        pcre2 = "10.49 2026-09-28"}
+ *                        pcre2 = "10.49 2026-09-28", mbedtls = "4.2.0"}
  *
  * The LuaJIT version is the running one's (jit.version without "LuaJIT "):
  * the .so may be loaded by a luajit other than the one it was built with.
@@ -31,6 +31,9 @@
 #ifdef META_HAVE_PCRE2
 #define PCRE2_CODE_UNIT_WIDTH 8 /* (pcre2.h insists on one) */
 #include "pcre2.h"
+#endif
+#ifdef META_HAVE_MBEDTLS
+#include "mbedtls/build_info.h"
 #endif
 
 #define STRING(a) #a
@@ -67,7 +70,7 @@ static int push_luajit_version(lua_State *L) {
 
 /* A new table each call: the caller may change it. */
 static int l_versions(lua_State *L) {
-  lua_createtable(L, 0, 5);
+  lua_createtable(L, 0, 6);
   lua_pushliteral(L, LUST_VERSION);
   lua_setfield(L, -2, "lust");
   if (push_luajit_version(L))
@@ -90,6 +93,10 @@ static int l_versions(lua_State *L) {
                         : XSTRING(PCRE2_MAJOR.PCRE2_MINOR) XSTRING(
                               PCRE2_PRERELEASE PCRE2_DATE));
   lua_setfield(L, -2, "pcre2");
+#endif
+#ifdef META_HAVE_MBEDTLS
+  lua_pushliteral(L, MBEDTLS_VERSION_STRING);
+  lua_setfield(L, -2, "mbedtls");
 #endif
   return 1;
 }

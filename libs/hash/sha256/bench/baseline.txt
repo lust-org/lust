@@ -1,0 +1,10 @@
+# User space instructions per run of each benchmark, checked by
+# tests/test_bench.py (see there). Regenerate after an intended change:
+#   ./dev.py test --suite bench --test-args=--update
+# <flavour> <benchmark> <instructions>
+luajit bulk.lua 484877587
+luajit short.lua 206082096
+luajit stream.lua 138466653
+lust bulk.lua 484851292
+lust short.lua 205964892
+lust stream.lua 137648275

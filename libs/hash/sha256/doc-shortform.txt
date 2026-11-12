@@ -1,0 +1,17 @@
+hex(str): str
+  SHA-256 of str as 64 lowercase hex digits
+
+digest(str): str
+  SHA-256 of str as 32 raw bytes
+
+new(): hasher
+  Hashes data that comes in pieces
+
+hasher:update(str): hasher
+  Adds str
+
+hasher:hex(): str
+  Like hex() of everything added so far; more may be added afterwards
+
+hasher:digest(): str
+  Like hasher:hex(), as raw bytes

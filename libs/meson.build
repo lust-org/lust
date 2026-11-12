@@ -45,6 +45,9 @@
 
 all_libs = [
   'hash.xxh',
+  'hash.md5',
+  'hash.sha1',
+  'hash.sha256',
   'pcre2',
   'json',
   'sys.fs',

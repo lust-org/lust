@@ -200,3 +200,66 @@ yyjson_dep = declare_dependency(
   compile_args: ['-DYYJSON_DISABLE_FILE=1', '-DYYJSON_DISABLE_UTILS=1', '-DYYJSON_DISABLE_INCR_READER=1'],
   link_args: ['-Wl,--exclude-libs,libyyjson.a'],
 )
+
+# ---------------------------------------------------------------------------
+# Mbed TLS, so far only its hashes (MD5, SHA-1, SHA-256): the builtin
+# drivers of TF-PSA-Crypto (vendored as part of mbedtls, which pulls it in
+# as a submodule), used through their own low-level API, not through PSA
+# (which would need the PSA core, a key store and an RNG). Upstream's CMake
+# build is not used, the sources are listed here.
+#
+# The configuration is generated (no file of ours may live in
+# vendor/mbedtls/): MBEDTLS_PSA_CRYPTO_C makes the PSA_WANT_ALG_* switch on
+# the builtin implementations (MBEDTLS_MD5_C, ...). It changes the layout
+# of the hash contexts, so users of the dependency compile with it, too.
+# Its name is relative (found through the build dir include path), so no
+# absolute path ends up in the build.
+# ---------------------------------------------------------------------------
+tfpsa_src = 'mbedtls' / 'tf-psa-crypto'
+tfpsa_cfg = configuration_data()
+tfpsa_cfg.set('MBEDTLS_PSA_CRYPTO_C', '')
+foreach alg : ['MD5', 'SHA_1', 'SHA_256']
+  tfpsa_cfg.set('PSA_WANT_ALG_' + alg, 1)
+endforeach
+configure_file(output: 'lust_tfpsa_config.h', configuration: tfpsa_cfg)
+tfpsa_args = ['-DTF_PSA_CRYPTO_CONFIG_FILE="lust_tfpsa_config.h"']
+tfpsa_inc = include_directories(
+  '.',
+  tfpsa_src / 'include',
+  tfpsa_src / 'drivers' / 'builtin' / 'include',
+  # (only for mbedtls/build_info.h: lust.meta reports the Mbed TLS version)
+  'mbedtls' / 'include',
+  is_system: true,
+)
+# One archive for all three: linking takes only the members that are used
+# (lust.hash.md5 gets md5.o and platform_util.o, no SHA code).
+mbedtls_lib = static_library(
+  'mbedtls',
+  files(
+    tfpsa_src / 'drivers' / 'builtin' / 'src' / 'md5.c',
+    tfpsa_src / 'drivers' / 'builtin' / 'src' / 'sha1.c',
+    tfpsa_src / 'drivers' / 'builtin' / 'src' / 'sha256.c',
+    # (mbedtls_platform_zeroize, which the hashes wipe their state with)
+    tfpsa_src / 'platform' / 'platform_util.c',
+  ),
+  include_directories: [
+    tfpsa_inc,
+    include_directories(tfpsa_src / 'core', is_system: true),
+  ],
+  c_args: tfpsa_args + [
+    '-DNDEBUG',
+    '-ffile-prefix-map=@0@=.'.format(meson.project_source_root()),
+    '-ffile-prefix-map=@0@=.'.format(meson.project_build_root()),
+  ],
+  override_options: ['warning_level=0'],
+  gnu_symbol_visibility: 'hidden',
+  pic: true,
+  build_by_default: false,
+)
+# (keep mbedtls_* out of the modules' and `lust`'s exports)
+mbedtls_dep = declare_dependency(
+  link_with: mbedtls_lib,
+  include_directories: tfpsa_inc,
+  compile_args: tfpsa_args,
+  link_args: ['-Wl,--exclude-libs,libmbedtls.a'],
+)

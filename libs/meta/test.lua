@@ -9,6 +9,7 @@ local formats = {
   xxhash = "^%d+%.%d+%.%d+$",
   yyjson = "^%d+%.%d+%.%d+$",
   pcre2 = "^10%.%d+ %d%d%d%d%-%d%d%-%d%d$", -- (as pcre2_config's)
+  mbedtls = "^%d+%.%d+%.%d+$",
 }
 
 T.run {
