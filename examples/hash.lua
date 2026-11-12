@@ -1,6 +1,6 @@
 -- lust.hash.xxh (Lua C API flavour): xxHash of a few strings.
 --
---   build/src/lust examples/xxh.lua
+--   build/src/lust examples/hash.lua
 
 local xxh = require "lust.hash.xxh"
 

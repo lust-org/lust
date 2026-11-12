@@ -110,7 +110,7 @@ build/src/lust -e 'print(require("lust.hash.xxh").xxh64("abc"))'
 `examples/*.lua` show each library and run with the built `lust`:
 
 ```sh
-build/src/lust examples/xxh.lua
+build/src/lust examples/hash.lua
 build/src/lust examples/pcre2.lua
 build/src/lust examples/sys.lua    # all of lust.sys.*
 ```
