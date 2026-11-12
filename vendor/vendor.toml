@@ -21,6 +21,9 @@ exclude = ["doc", "test"]
 repo_url = "https://github.com/Mbed-TLS/mbedtls.git"
 rev = "v4.2.0"
 exclude = ["tests", "programs"]
+# All crypto (hashes included) lives in the tf-psa-crypto submodule; the
+# frameworks are test and script helpers only.
+submodules = { exclude = ["framework", "tf-psa-crypto/framework"] }
 
 [curl]
 repo_url = "https://github.com/curl/curl.git"
